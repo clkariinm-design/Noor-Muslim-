@@ -174,12 +174,6 @@ fun QuranScreen(
                     text = { Text("${strings.bookmarksTab} (${bookmarks.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
                     modifier = Modifier.testTag("tab_bookmarks")
                 )
-                Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    text = { Text(strings.downloads, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
-                    modifier = Modifier.testTag("tab_downloads")
-                )
             }
 
             val bottomPadding = if (currentTrack != null && playbackState != com.example.data.repository.PlaybackState.IDLE) 80.dp else 16.dp
