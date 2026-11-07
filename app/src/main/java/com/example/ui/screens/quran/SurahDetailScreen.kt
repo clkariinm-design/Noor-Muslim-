@@ -204,47 +204,6 @@ fun SurahDetailScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Download button
-                if (isDownloading) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .padding(6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { (downloadStatus?.progressPercent ?: 0) / 100f },
-                            strokeWidth = 2.dp,
-                            color = IslamicEmerald
-                        )
-                    }
-                } else if (isDownloaded) {
-                    IconButton(
-                        onClick = {
-                            Toast.makeText(context, "${strings.offlineAudioReady} (${selectedQari.name})", Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.OfflinePin,
-                            contentDescription = strings.offlineAudioReady,
-                            tint = IslamicEmerald
-                        )
-                    }
-                } else {
-                    IconButton(
-                        onClick = {
-                            QuranAudioDownloadManager.downloadSurah(context, surah.number, selectedQari)
-                            Toast.makeText(context, "${strings.downloading} ${surah.nameEnglish}", Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = strings.downloadSurah,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
                 // Reciter selection button
                 IconButton(onClick = { showReciterDialog = true }) {
                     Icon(
