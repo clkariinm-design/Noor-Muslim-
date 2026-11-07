@@ -26,6 +26,7 @@ object AdhanScheduler {
     fun scheduleAll(context: Context, city: CityLocation? = null) {
         val app = context.applicationContext
         val prefs = AppPreferences(app)
+        AdhanPlaybackService.prefetchAll(app)
         val location = city ?: prefs.getSelectedCity()
         val alarmManager = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val zone = TimeZone.getTimeZone(location.timeZoneId)
