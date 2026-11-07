@@ -306,39 +306,7 @@ fun SurahDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
-                    // Bismillah Banner (All surahs except Surah At-Tawbah 9)
-                    if (surah.number != 9) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(QuranParchment)
-                                    .border(1.dp, IslamicGold.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
-                                    .padding(vertical = 16.dp, horizontal = 20.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-                                        fontFamily = AmiriFontFamily,
-                                        fontSize = 26.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = IslamicEmeraldDark,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = strings.bismillah,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    // The bundled Uthmani text already includes each surah's basmala where applicable.
 
                     // Ayah Items
                     items(ayahs, key = { it.numberInSurah }) { ayah ->
