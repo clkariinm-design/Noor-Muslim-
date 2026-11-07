@@ -8,18 +8,10 @@ import com.example.data.model.Qari
 import com.example.data.model.Surah
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 object QuranRepository {
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .build()
 
     // Complete verified index of all 114 Surahs
     val allSurahs: List<Surah> = listOf(
@@ -180,58 +172,79 @@ object QuranRepository {
     private val memoryCache = mutableMapOf<Int, List<Ayah>>()
 
     /**
-     * Retrieves Ayahs for a Surah. Uses cache -> local fallback -> API.
+     * Loads the original Uthmani Quran text bundled in the APK.
+     * This path never requires an internet connection.
      */
     suspend fun getSurahAyahs(
         context: Context,
         surahNumber: Int,
         selectedQari: Qari = AvailableQaris[0]
     ): List<Ayah> = withContext(Dispatchers.IO) {
-        // 1. Check memory cache
-        memoryCache[surahNumber]?.let { return@withContext it }
+        val surah = allSurahs.firstOrNull { it.number == surahNumber }
+            ?: return@withContext emptyList()
 
-        // 2. Check disk cache
-        val diskFile = File(context.cacheDir, "surah_$surahNumber.json")
-        if (diskFile.exists()) {
-            try {
-                val json = diskFile.readText()
-                val ayahs = parseAyahsJson(json, surahNumber, selectedQari)
-                if (ayahs.isNotEmpty()) {
-                    memoryCache[surahNumber] = ayahs
-                    return@withContext ayahs
-                }
-            } catch (e: Exception) {
-                // fall through
+        memoryCache[surahNumber]?.let { cached ->
+            return@withContext cached.map { ayah ->
+                ayah.copy(audioUrl = getAyahAudioUrl(selectedQari, surahNumber, ayah.numberInSurah))
             }
         }
 
-        // 3. Check bundled offline Surahs
-        val bundled = getBundledSurah(surahNumber, selectedQari)
-        if (bundled.isNotEmpty()) {
-            memoryCache[surahNumber] = bundled
-            return@withContext bundled
+        val allText = getBundledQuranLines(context)
+        val startIndex = allSurahs.takeWhile { it.number != surahNumber }.sumOf { it.ayahCount }
+        val endIndex = startIndex + surah.ayahCount
+        require(endIndex <= allText.size) { "Bundled Quran text is incomplete" }
+
+        // Previously downloaded translation cache may be reused, but Arabic always
+        // comes from the immutable Tanzil asset bundled with the application.
+        val translationFile = File(context.cacheDir, "surah_$surahNumber.json")
+        val cachedTranslations = try {
+            if (translationFile.exists()) parseAyahsJson(
+                translationFile.readText(),
+                surahNumber,
+                selectedQari
+            ) else emptyList()
+        } catch (_: Exception) {
+            emptyList()
         }
 
-        // 4. Fetch from verified AlQuran.cloud API with translations
-        try {
-            val url = "https://api.alquran.cloud/v1/surah/$surahNumber/editions/quran-uthmani,en.sahih,so.abduh,tr.diyanet,fr.hamidullah"
-            val request = Request.Builder().url(url).build()
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string() ?: ""
-                diskFile.writeText(body)
-                val ayahs = parseAyahsJson(body, surahNumber, selectedQari)
-                if (ayahs.isNotEmpty()) {
-                    memoryCache[surahNumber] = ayahs
-                    return@withContext ayahs
+        val ayahs = allText.subList(startIndex, endIndex).mapIndexed { index, arabicText ->
+            val translated = cachedTranslations.getOrNull(index)
+            Ayah(
+                numberInSurah = index + 1,
+                textArabic = arabicText,
+                translationEn = translated?.translationEn.orEmpty(),
+                translationSo = translated?.translationSo.orEmpty(),
+                translationTr = translated?.translationTr.orEmpty(),
+                translationFr = translated?.translationFr.orEmpty(),
+                audioUrl = getAyahAudioUrl(selectedQari, surahNumber, index + 1)
+            )
+        }
+
+        memoryCache[surahNumber] = ayahs
+        ayahs
+    }
+
+    @Volatile
+    private var bundledQuranLines: List<String>? = null
+
+    private fun getBundledQuranLines(context: Context): List<String> {
+        bundledQuranLines?.let { return it }
+        synchronized(this) {
+            bundledQuranLines?.let { return it }
+            val lines = context.assets.open("quran-uthmani-1.1.txt")
+                .bufferedReader(Charsets.UTF_8)
+                .useLines { sequence ->
+                    sequence.filter { line ->
+                        line.isNotBlank() && !line.startsWith("#")
+                    }.toList()
                 }
+            val expectedAyahs = allSurahs.sumOf { it.ayahCount }
+            check(lines.size == expectedAyahs && expectedAyahs == 6236) {
+                "Bundled Quran text validation failed: expected $expectedAyahs ayahs, found ${lines.size}"
             }
-        } catch (e: Exception) {
-            // Network failed or offline
+            bundledQuranLines = lines
+            return lines
         }
-
-        // Return emptyList so UI can prompt user to connect to download verified Arabic text
-        return@withContext emptyList<Ayah>()
     }
 
     private fun parseAyahsJson(jsonString: String, surahNumber: Int, selectedQari: Qari): List<Ayah> {
