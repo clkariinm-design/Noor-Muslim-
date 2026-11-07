@@ -24,9 +24,9 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
-          packages: platform-tools
+          packages: 'platform-tools'
 
       - name: Install Android SDK
         run: |
@@ -52,6 +52,17 @@ jobs:
             -keysize 2048 \
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Verify bundled Quran corpus
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("app/src/main/assets/quran-uthmani-1.1.txt")
+          lines = [line for line in path.read_text(encoding="utf-8").splitlines()
+                   if line.strip() and not line.startswith("#")]
+          assert len(lines) == 6236, f"Expected 6236 ayahs, got {len(lines)}"
+          print("Verified bundled Tanzil text: 6,236 ayahs")
+          PY
 
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDebug
