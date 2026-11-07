@@ -35,7 +35,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          sdkmanager "platform-tools" "platforms;android-36" "platforms;android-36-ext16" "build-tools;36.0.0"
+          sdkmanager "platform-tools" "platforms;android-36.1" "build-tools;36.0.0"
 
       - name: Verify bundled Quran corpus
         run: |
