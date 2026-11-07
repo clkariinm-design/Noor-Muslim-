@@ -129,7 +129,11 @@ fun PrayerTimesScreen(
     var notificationsEnabled by remember { mutableStateOf(appPreferences.isPrayerNotificationsEnabled()) }
 
     // Live clock ticker in geographical timezone
-    LaunchedEffect(currentCity, calculationMethod, juristicMethod) {\n        AdhanScheduler.scheduleAll(context, currentCity)\n    }\n\n    LaunchedEffect(currentCity.timeZoneId) {
+    LaunchedEffect(currentCity, calculationMethod, juristicMethod) {
+        AdhanScheduler.scheduleAll(context, currentCity)
+    }
+
+    LaunchedEffect(currentCity.timeZoneId) {
         while (true) {
             delay(1000)
             currentTime = Calendar.getInstance(TimeZone.getTimeZone(currentCity.timeZoneId))
