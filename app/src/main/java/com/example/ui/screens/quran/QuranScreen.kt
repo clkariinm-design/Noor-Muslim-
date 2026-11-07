@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -83,6 +84,7 @@ fun QuranScreen(
     onSelectSurah: (Int) -> Unit
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -251,6 +253,21 @@ fun QuranScreen(
                                 isDownloaded = isDownloaded,
                                 onClick = { onSelectSurah(surah.number) }
                             )
+                        }
+
+                        if (searchQuery.isBlank()) {
+                            item {
+                                Text(
+                                    text = "Quran text: Tanzil Project • tanzil.net",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { uriHandler.openUri("https://tanzil.net/") }
+                                        .padding(vertical = 18.dp),
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }
