@@ -1,0 +1,6 @@
+{
+  "name": "Noor Muslim",
+  "description": "Complete professional Islamic app with Holy Quran, accurate Prayer Times, Qibla compass, Digital Tasbeeh, Daily Duas, and 5 languages (Somali, Arabic, English, Turkish, French).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
