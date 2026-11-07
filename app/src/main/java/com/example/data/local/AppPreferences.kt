@@ -268,4 +268,21 @@ class AppPreferences(context: Context) {
     fun setPrayerNotificationsEnabled(enabled: Boolean) {
         prefs.edit().putBoolean("key_prayer_notifs", enabled).apply()
     }
+    // Per-prayer Adhan controls (enabled by default for the five obligatory prayers).
+    fun isAdhanEnabled(prayer: com.example.data.model.PrayerType): Boolean =
+        prefs.getBoolean("key_adhan_${prayer.name.lowercase()}", prayer != com.example.data.model.PrayerType.SUNRISE)
+
+    fun setAdhanEnabled(prayer: com.example.data.model.PrayerType, enabled: Boolean) {
+        prefs.edit().putBoolean("key_adhan_${prayer.name.lowercase()}", enabled).apply()
+    }
+
+    fun areAdhansEnabled(): Boolean =
+        listOf(
+            com.example.data.model.PrayerType.FAJR,
+            com.example.data.model.PrayerType.DHUHR,
+            com.example.data.model.PrayerType.ASR,
+            com.example.data.model.PrayerType.MAGHRIB,
+            com.example.data.model.PrayerType.ISHA
+        ).any { isAdhanEnabled(it) }
+
 }
