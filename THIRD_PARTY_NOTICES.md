@@ -14,3 +14,11 @@ Copyright (C) 2007-2021 Tanzil Project
 License: Creative Commons Attribution 3.0
 
 This copy of the Quran text is carefully produced, highly verified and continuously monitored by a group of specialists in Tanzil Project.
+
+## Adhan recordings — Doha, Qatar
+
+Five prayer-specific Adhan recordings are streamed from and cached from the Internet Archive item “Adhan Recordings from Doha, Qatar” (recorded 2013–2014; uploader shown as Doha, Qatar). The item is marked Public Domain Mark 1.0 by the Internet Archive.
+
+Source: https://archive.org/details/adhan.recordings.from.doha.qatar
+Audio files: https://archive.org/download/adhan.recordings.from.doha.qatar/
+Usage designation shown on source item: Public Domain Mark 1.0
