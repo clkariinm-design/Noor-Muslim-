@@ -20,6 +20,7 @@ import com.example.data.local.AppPreferences
 import com.example.data.model.AppLanguage
 import com.example.data.model.Translations
 import com.example.data.repository.AudioPlayerManager
+import com.example.data.service.AdhanScheduler
 import com.example.ui.components.NoorBottomNav
 import com.example.ui.components.NoorNavDestination
 import com.example.ui.components.NoorTopBar
@@ -48,6 +49,7 @@ fun NoorMuslimApp() {
     val currentTrack by AudioPlayerManager.currentTrack.collectAsState()
     val isRepeatOne by AudioPlayerManager.isRepeatOne.collectAsState()
 
+    // Refresh prayer alarms whenever the selected city changes and on app launch.\n    LaunchedEffect(currentCity) { AdhanScheduler.scheduleAll(context, currentCity) }\n
     val isDark = when (themeMode) {
         "LIGHT" -> false
         "DARK" -> true
