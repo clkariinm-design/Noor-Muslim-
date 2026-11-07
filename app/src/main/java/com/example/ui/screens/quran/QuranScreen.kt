@@ -188,6 +188,62 @@ fun QuranScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        // Calm Quran introduction banner
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 4.dp)
+                                    .testTag("quran_intro_card"),
+                                shape = RoundedCornerShape(22.dp),
+                                colors = CardDefaults.cardColors(containerColor = IslamicEmerald)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "الْقُرْآنُ الْكَرِيمُ",
+                                            fontFamily = AmiriFontFamily,
+                                            fontSize = 27.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = IslamicGoldBright
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "114 Surahs  •  6,236 Ayahs",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "Available offline",
+                                            fontSize = 11.sp,
+                                            color = Color.White.copy(alpha = 0.78f)
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(54.dp)
+                                            .clip(CircleShape)
+                                            .background(IslamicGold.copy(alpha = 0.16f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "۞",
+                                            fontFamily = AmiriFontFamily,
+                                            fontSize = 36.sp,
+                                            color = IslamicGoldBright
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // Last read banner
                         if (lastRead != null && searchQuery.isBlank()) {
                             item {
