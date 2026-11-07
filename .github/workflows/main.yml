@@ -57,11 +57,25 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import hashlib
+          import re
+
           path = Path("app/src/main/assets/quran-uthmani-1.1.txt")
-          lines = [line for line in path.read_text(encoding="utf-8").splitlines()
+          raw = path.read_bytes()
+          expected_sha256 = "ac0724796cbbda0f4801470fbbd11d0f3c5802067bae0493466d0128b0c667af"
+          actual_sha256 = hashlib.sha256(raw).hexdigest()
+          assert actual_sha256 == expected_sha256, f"Tanzil source checksum mismatch: {actual_sha256}"
+
+          lines = [line for line in raw.decode("utf-8").splitlines()
                    if line.strip() and not line.startswith("#")]
+          source = Path("app/src/main/java/com/example/data/repository/QuranRepository.kt").read_text(encoding="utf-8")
+          counts = [int(value) for value in re.findall(
+              r'Surah\\(\\d+,\\s*".*?",\\s*".*?",\\s*".*?",\\s*(\\d+),', source
+          )]
+          assert len(counts) == 114, f"Expected 114 surah records, got {len(counts)}"
+          assert sum(counts) == 6236, f"Surah index totals {sum(counts)} ayahs"
           assert len(lines) == 6236, f"Expected 6236 ayahs, got {len(lines)}"
-          print("Verified bundled Tanzil text: 6,236 ayahs")
+          print("Verified Tanzil SHA-256, 114 surahs and all 6,236 ayahs")
           PY
 
       - name: Build APK
