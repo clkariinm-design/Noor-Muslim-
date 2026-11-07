@@ -94,21 +94,7 @@ class AdhanPlaybackService : Service() {
             prepare()
             playWhenReady = true
         }
-        if (!file.exists()) {
-            io.execute {
-                runCatching {
-                    val connection = URL(url).openConnection() as HttpURLConnection
-                    connection.connectTimeout = 15000
-                    connection.readTimeout = 30000
-                    connection.instanceFollowRedirects = true
-                    connection.connect()
-                    connection.inputStream.use { input ->
-                        file.outputStream().use { output -> input.copyTo(output) }
-                    }
-                    connection.disconnect()
-                }
-            }
-        }
+        if (!file.exists()) prefetchPrayer(this, prayer)
     }
 
     private fun finishAdhan() {
@@ -180,6 +166,35 @@ class AdhanPlaybackService : Service() {
             PrayerType.MAGHRIB to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_04_Maghrib_Adhan.mp3",
             PrayerType.ISHA to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_05_Isha_Adhan.mp3"
         )
+
+        private val cacheExecutor = Executors.newSingleThreadExecutor()
+
+        fun prefetchAll(context: android.content.Context) {
+            listOf(PrayerType.FAJR, PrayerType.DHUHR, PrayerType.ASR, PrayerType.MAGHRIB, PrayerType.ISHA)
+                .forEach { prayer -> prefetchPrayer(context.applicationContext, prayer) }
+        }
+
+        private fun prefetchPrayer(context: android.content.Context, prayer: PrayerType) {
+            val source = AUDIO_URLS[prayer] ?: return
+            val target = File(context.filesDir, "adhan/${prayer.name.lowercase()}.mp3")
+            if (target.exists() && target.length() > 20_000L) return
+            cacheExecutor.execute {
+                runCatching {
+                    target.parentFile?.mkdirs()
+                    val connection = URL(source).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 30000
+                    connection.instanceFollowRedirects = true
+                    connection.connect()
+                    connection.inputStream.use { input ->
+                        val temporary = File(target.parentFile, target.name + ".part")
+                        temporary.outputStream().use { output -> input.copyTo(output) }
+                        if (temporary.length() > 20_000L) temporary.renameTo(target) else temporary.delete()
+                    }
+                    connection.disconnect()
+                }
+            }
+        }
 
         fun playTest(context: android.content.Context, prayer: PrayerType) {
             val intent = Intent(context, AdhanPlaybackService::class.java).apply {
