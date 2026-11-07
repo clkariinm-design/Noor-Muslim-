@@ -70,7 +70,7 @@ jobs:
                    if line.strip() and not line.startswith("#")]
           source = Path("app/src/main/java/com/example/data/repository/QuranRepository.kt").read_text(encoding="utf-8")
           counts = [int(value) for value in re.findall(
-              r'Surah\\(\\d+,\\s*".*?",\\s*".*?",\\s*".*?",\\s*(\\d+),', source
+              r'Surah\(\d+,\s*".*?",\s*".*?",\s*".*?",\s*(\d+),', source
           )]
           assert len(counts) == 114, f"Expected 114 surah records, got {len(counts)}"
           assert sum(counts) == 6236, f"Surah index totals {sum(counts)} ayahs"
