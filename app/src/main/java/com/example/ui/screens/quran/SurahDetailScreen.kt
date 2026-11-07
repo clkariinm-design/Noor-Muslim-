@@ -238,7 +238,7 @@ fun SurahDetailScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = IslamicEmerald)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "Loading verified verses...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = "Opening Surah...", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else if (ayahs.isEmpty()) {
@@ -278,7 +278,7 @@ fun SurahDetailScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Connect to the internet to download the complete verified original Uthmani text and translations for this Surah.",
+                            text = "The Quran text could not be opened. Please try again.",
                             textAlign = TextAlign.Center,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -294,7 +294,7 @@ fun SurahDetailScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = IslamicEmerald)
                         ) {
-                            Text("Retry Download", color = Color.White)
+                            Text("Try Again", color = Color.White)
                         }
                     }
                 }
