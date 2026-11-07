@@ -146,7 +146,9 @@ fun NoorMuslimApp() {
                             )
                             NoorNavDestination.QIBLA -> QiblaScreen(
                                 strings = strings,
-                                currentCity = currentCity
+                                currentCity = currentCity,
+                                appPreferences = appPreferences,
+                                onLocationChanged = { appPreferences.setSelectedCity(it) }
                             )
                             NoorNavDestination.TASBEEH -> TasbeehScreen(
                                 strings = strings,

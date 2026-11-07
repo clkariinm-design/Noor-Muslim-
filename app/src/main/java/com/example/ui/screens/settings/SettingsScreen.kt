@@ -56,6 +56,7 @@ import com.example.data.model.JuristicMethod
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
 import com.example.ui.components.IslamicOrnamentCard
+import com.example.ui.screens.quran.ReciterSelectionDialog
 import com.example.ui.theme.AmiriFontFamily
 import com.example.ui.theme.IslamicEmerald
 import com.example.ui.theme.IslamicGold
@@ -359,46 +360,15 @@ fun SettingsScreen(
 
     // Qari Selector Dialog
     if (showQariDialog) {
-        AlertDialog(
-            onDismissRequest = { showQariDialog = false },
-            title = { Text(strings.reciter, fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    AvailableQaris.forEach { qari ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedQariId = qari.id
-                                    appPreferences.setSelectedQariId(qari.id)
-                                    showQariDialog = false
-                                }
-                                .padding(vertical = 8.dp)
-                        ) {
-                            RadioButton(
-                                selected = selectedQariId == qari.id,
-                                onClick = {
-                                    selectedQariId = qari.id
-                                    appPreferences.setSelectedQariId(qari.id)
-                                    showQariDialog = false
-                                },
-                                colors = RadioButtonDefaults.colors(selectedColor = IslamicEmerald)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(text = qari.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(text = qari.subName, fontFamily = AmiriFontFamily, fontSize = 13.sp, color = IslamicGold)
-                            }
-                        }
-                    }
-                }
+        ReciterSelectionDialog(
+            selectedQariId = selectedQariId,
+            strings = strings,
+            onSelectQari = { qari ->
+                selectedQariId = qari.id
+                appPreferences.setSelectedQariId(qari.id)
+                showQariDialog = false
             },
-            confirmButton = {
-                TextButton(onClick = { showQariDialog = false }) {
-                    Text(strings.cancel)
-                }
-            }
+            onDismiss = { showQariDialog = false }
         )
     }
 

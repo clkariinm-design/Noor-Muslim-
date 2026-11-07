@@ -29,10 +29,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -45,6 +49,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -52,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,13 +76,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.AppPreferences
 import com.example.data.model.AppLanguage
+import com.example.data.model.AudioRepeatMode
 import com.example.data.model.AvailableQaris
 import com.example.data.model.Ayah
+import com.example.data.model.DownloadState
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
 import com.example.data.repository.AudioPlayerManager
 import com.example.data.repository.CurrentPlayingTrack
 import com.example.data.repository.PlaybackState
+import com.example.data.repository.QuranAudioDownloadManager
 import com.example.data.repository.QuranRepository
 import com.example.ui.theme.AmiriFontFamily
 import com.example.ui.theme.IslamicEmerald
@@ -107,20 +116,31 @@ fun SurahDetailScreen(
         QuranRepository.allSurahs.firstOrNull { it.number == surahNumber } ?: QuranRepository.allSurahs[0]
     }
 
-    val selectedQari = remember {
+    var selectedQari by remember {
         val qId = appPreferences.getSelectedQariId()
-        AvailableQaris.firstOrNull { it.id == qId } ?: AvailableQaris[0]
+        mutableStateOf(AvailableQaris.firstOrNull { it.id == qId } ?: AvailableQaris[0])
     }
+
+    val repeatMode by AudioPlayerManager.repeatMode.collectAsState()
+    val currentPositionMs by AudioPlayerManager.currentPositionMs.collectAsState()
+    val durationMs by AudioPlayerManager.durationMs.collectAsState()
+    val downloadStatuses by QuranAudioDownloadManager.downloadStatuses.collectAsState()
+
+    val downloadKey = "${selectedQari.id}_${surah.number}"
+    val downloadStatus = downloadStatuses[downloadKey]
+    val isDownloaded = downloadStatus?.state == DownloadState.COMPLETED || QuranAudioDownloadManager.isSurahDownloaded(context, surah.number, selectedQari.id)
+    val isDownloading = downloadStatus?.state == DownloadState.DOWNLOADING
 
     var ayahs by remember { mutableStateOf<List<Ayah>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showFontSizeDialog by remember { mutableStateOf(false) }
+    var showReciterDialog by remember { mutableStateOf(false) }
 
     var arabicFontSize by remember { mutableStateOf(appPreferences.getArabicFontSize()) }
     var translationFontSize by remember { mutableStateOf(appPreferences.getTranslationFontSize()) }
 
     // Load Ayahs
-    LaunchedEffect(surahNumber) {
+    LaunchedEffect(surahNumber, selectedQari) {
         isLoading = true
         ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
         isLoading = false
@@ -130,7 +150,7 @@ fun SurahDetailScreen(
     }
 
     // Connect auto-play next Ayah
-    LaunchedEffect(ayahs) {
+    LaunchedEffect(ayahs, selectedQari) {
         AudioPlayerManager.onAyahCompletedListener = { sNum, aNum ->
             if (sNum == surah.number && aNum < ayahs.size) {
                 AudioPlayerManager.playAyah(
@@ -184,6 +204,57 @@ fun SurahDetailScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Download button
+                if (isDownloading) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .padding(6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { (downloadStatus?.progressPercent ?: 0) / 100f },
+                            strokeWidth = 2.dp,
+                            color = IslamicEmerald
+                        )
+                    }
+                } else if (isDownloaded) {
+                    IconButton(
+                        onClick = {
+                            Toast.makeText(context, "${strings.offlineAudioReady} (${selectedQari.name})", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OfflinePin,
+                            contentDescription = strings.offlineAudioReady,
+                            tint = IslamicEmerald
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = {
+                            QuranAudioDownloadManager.downloadSurah(context, surah.number, selectedQari)
+                            Toast.makeText(context, "${strings.downloading} ${surah.nameEnglish}", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = strings.downloadSurah,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                // Reciter selection button
+                IconButton(onClick = { showReciterDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.RecordVoiceOver,
+                        contentDescription = strings.selectReciter,
+                        tint = IslamicGold
+                    )
+                }
+
+                // Font size button
                 IconButton(onClick = { showFontSizeDialog = true }) {
                     Icon(
                         imageVector = Icons.Default.FormatSize,
@@ -191,6 +262,7 @@ fun SurahDetailScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
+
                 Text(
                     text = surah.nameArabic,
                     fontFamily = AmiriFontFamily,
@@ -250,8 +322,7 @@ fun SurahDetailScreen(
                             text = "Connect to the internet to download the complete verified original Uthmani text and translations for this Surah.",
                             textAlign = TextAlign.Center,
                             fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(20.dp))
                         Button(
@@ -262,10 +333,9 @@ fun SurahDetailScreen(
                                     isLoading = false
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = IslamicEmerald),
-                            shape = RoundedCornerShape(12.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = IslamicEmerald)
                         ) {
-                            Text("Download Verified Verses", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Retry Download", color = Color.White)
                         }
                     }
                 }
@@ -277,37 +347,33 @@ fun SurahDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
-                    // Bismillah Banner (All surahs except Surah 9 At-Tawbah)
+                    // Bismillah Banner (All surahs except Surah At-Tawbah 9)
                     if (surah.number != 9) {
                         item {
-                            Card(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = IslamicEmeraldDark
-                                ),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(QuranParchment)
+                                    .border(1.dp, IslamicGold.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                    .padding(vertical = 16.dp, horizontal = 20.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 18.dp, horizontal = 16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
                                         text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
                                         fontFamily = AmiriFontFamily,
                                         fontSize = 26.sp,
-                                        color = IslamicGoldBright,
+                                        fontWeight = FontWeight.Bold,
+                                        color = IslamicEmeraldDark,
                                         textAlign = TextAlign.Center
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = strings.bismillah,
-                                        fontSize = 12.sp,
-                                        color = Color.White.copy(alpha = 0.85f),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         textAlign = TextAlign.Center
                                     )
                                 }
@@ -315,11 +381,12 @@ fun SurahDetailScreen(
                         }
                     }
 
-                    // Ayahs List
+                    // Ayah Items
                     items(ayahs, key = { it.numberInSurah }) { ayah ->
-                        val isPlayingThisAyah = currentTrack?.surahNumber == surah.number &&
-                                currentTrack.ayahNumber == ayah.numberInSurah &&
-                                playbackState == PlaybackState.PLAYING
+                        val isPlayingThisAyah = currentTrack != null &&
+                            currentTrack.surahNumber == surah.number &&
+                            currentTrack.ayahNumber == ayah.numberInSurah &&
+                            playbackState != PlaybackState.IDLE
 
                         val isBookmarked = appPreferences.isBookmarked(surah.number, ayah.numberInSurah)
 
@@ -333,7 +400,7 @@ fun SurahDetailScreen(
                             strings = strings,
                             language = language,
                             onPlay = {
-                                if (isPlayingThisAyah) {
+                                if (isPlayingThisAyah && playbackState == PlaybackState.PLAYING) {
                                     AudioPlayerManager.pause()
                                 } else {
                                     AudioPlayerManager.playAyah(
@@ -346,24 +413,12 @@ fun SurahDetailScreen(
                                 }
                             },
                             onToggleBookmark = {
-                                val added = appPreferences.toggleBookmark(
-                                    surah.number,
-                                    surah.nameEnglish,
-                                    ayah.numberInSurah
-                                )
-                                Toast.makeText(
-                                    context,
-                                    if (added) strings.bookmarkAdded else strings.bookmarkRemoved,
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                appPreferences.toggleBookmark(surah.number, surah.nameEnglish, ayah.numberInSurah)
                             },
                             onCopy = {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText(
-                                    "Ayah",
-                                    "${ayah.textArabic}\n${ayah.getTranslation(language)}\n[${surah.nameEnglish} ${surah.number}:${ayah.numberInSurah}]"
-                                )
-                                cm.setPrimaryClip(clip)
+                                val text = "${ayah.textArabic}\n\n${ayah.getTranslation(language)}\n[${surah.nameEnglish} ${surah.number}:${ayah.numberInSurah}]"
+                                cm.setPrimaryClip(ClipData.newPlainText("Ayah", text))
                                 Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -382,96 +437,124 @@ fun SurahDetailScreen(
                         colors = CardDefaults.cardColors(containerColor = IslamicEmerald),
                         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "${currentTrack.surahName} • Verse ${currentTrack.ayahNumber}/${currentTrack.totalAyahs}",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = currentTrack.qari.name,
-                                    color = IslamicGoldBright,
-                                    fontSize = 12.sp
-                                )
-                            }
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // Scrubber progress
+                            val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp),
+                                color = IslamicGoldBright,
+                                trackColor = Color.Black.copy(alpha = 0.2f)
+                            )
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Repeat toggle
-                                IconButton(onClick = { AudioPlayerManager.toggleRepeat() }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Repeat,
-                                        contentDescription = "Repeat",
-                                        tint = if (isRepeatOne) IslamicGoldBright else Color.White.copy(alpha = 0.5f)
-                                    )
-                                }
-
-                                // Prev
-                                IconButton(
-                                    onClick = {
-                                        if (currentTrack.ayahNumber > 1) {
-                                            AudioPlayerManager.playAyah(
-                                                surahNumber = surah.number,
-                                                surahName = surah.nameEnglish,
-                                                ayahNumber = currentTrack.ayahNumber - 1,
-                                                totalAyahs = ayahs.size,
-                                                qari = selectedQari
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "${currentTrack.surahName} • Verse ${currentTrack.ayahNumber}/${currentTrack.totalAyahs}",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        if (currentTrack.isOfflineSource) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.OfflinePin,
+                                                contentDescription = strings.offlineAudioReady,
+                                                tint = IslamicGoldBright,
+                                                modifier = Modifier.size(14.dp)
                                             )
                                         }
-                                    },
-                                    enabled = currentTrack.ayahNumber > 1
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SkipPrevious,
-                                        contentDescription = "Previous",
-                                        tint = Color.White
+                                    }
+                                    Text(
+                                        text = "${currentTrack.qari.name} (${currentTrack.qari.quality})",
+                                        color = IslamicGoldBright,
+                                        fontSize = 12.sp
                                     )
                                 }
 
-                                // Play / Pause
-                                Box(
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(CircleShape)
-                                        .background(IslamicGold),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    IconButton(onClick = { AudioPlayerManager.togglePlayPause() }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Repeat toggle
+                                    IconButton(onClick = { AudioPlayerManager.toggleRepeat() }) {
                                         Icon(
-                                            imageVector = if (playbackState == PlaybackState.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            contentDescription = "Play/Pause",
-                                            tint = IslamicEmeraldDark
+                                            imageVector = when (repeatMode) {
+                                                AudioRepeatMode.REPEAT_ONE -> Icons.Default.RepeatOne
+                                                AudioRepeatMode.REPEAT_SURAH -> Icons.Default.Repeat
+                                                AudioRepeatMode.OFF -> Icons.Default.Repeat
+                                            },
+                                            contentDescription = "Repeat",
+                                            tint = if (repeatMode != AudioRepeatMode.OFF) IslamicGoldBright else Color.White.copy(alpha = 0.5f)
                                         )
                                     }
-                                }
 
-                                // Next
-                                IconButton(
-                                    onClick = {
-                                        if (currentTrack.ayahNumber < ayahs.size) {
-                                            AudioPlayerManager.playAyah(
-                                                surahNumber = surah.number,
-                                                surahName = surah.nameEnglish,
-                                                ayahNumber = currentTrack.ayahNumber + 1,
-                                                totalAyahs = ayahs.size,
-                                                qari = selectedQari
+                                    // Prev
+                                    IconButton(
+                                        onClick = {
+                                            if (currentTrack.ayahNumber > 1) {
+                                                AudioPlayerManager.playAyah(
+                                                    surahNumber = surah.number,
+                                                    surahName = surah.nameEnglish,
+                                                    ayahNumber = currentTrack.ayahNumber - 1,
+                                                    totalAyahs = ayahs.size,
+                                                    qari = selectedQari
+                                                )
+                                            }
+                                        },
+                                        enabled = currentTrack.ayahNumber > 1
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.SkipPrevious,
+                                            contentDescription = "Previous",
+                                            tint = Color.White
+                                        )
+                                    }
+
+                                    // Play / Pause
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(IslamicGold),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        IconButton(onClick = { AudioPlayerManager.togglePlayPause() }) {
+                                            Icon(
+                                                imageVector = if (playbackState == PlaybackState.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                contentDescription = "Play/Pause",
+                                                tint = IslamicEmeraldDark
                                             )
                                         }
-                                    },
-                                    enabled = currentTrack.ayahNumber < ayahs.size
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SkipNext,
-                                        contentDescription = "Next",
-                                        tint = Color.White
-                                    )
+                                    }
+
+                                    // Next
+                                    IconButton(
+                                        onClick = {
+                                            if (currentTrack.ayahNumber < ayahs.size) {
+                                                AudioPlayerManager.playAyah(
+                                                    surahNumber = surah.number,
+                                                    surahName = surah.nameEnglish,
+                                                    ayahNumber = currentTrack.ayahNumber + 1,
+                                                    totalAyahs = ayahs.size,
+                                                    qari = selectedQari
+                                                )
+                                            }
+                                        },
+                                        enabled = currentTrack.ayahNumber < ayahs.size
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.SkipNext,
+                                            contentDescription = "Next",
+                                            tint = Color.White
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -518,6 +601,20 @@ fun SurahDetailScreen(
                     Text("OK", color = IslamicEmerald, fontWeight = FontWeight.Bold)
                 }
             }
+        )
+    }
+
+    // Reciter Selection Dialog
+    if (showReciterDialog) {
+        ReciterSelectionDialog(
+            selectedQariId = selectedQari.id,
+            strings = strings,
+            onSelectQari = { newQari ->
+                selectedQari = newQari
+                appPreferences.setSelectedQariId(newQari.id)
+                showReciterDialog = false
+            },
+            onDismiss = { showReciterDialog = false }
         )
     }
 }

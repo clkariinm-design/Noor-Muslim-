@@ -464,7 +464,7 @@ fun PrayerTimesScreen(
                     ) {
                         Icon(
                             imageVector = if (notificationsEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                            contentDescription = strings.notifications,
+                            contentDescription = if (notificationsEnabled) strings.notificationsEnabled else strings.notificationsDisabled,
                             tint = if (notificationsEnabled) IslamicEmerald else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }

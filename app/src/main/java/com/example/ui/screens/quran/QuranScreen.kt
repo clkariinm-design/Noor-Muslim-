@@ -23,7 +23,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.OfflinePin
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +42,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,20 +52,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppLanguage
+import com.example.data.model.AvailableQaris
+import com.example.data.model.DownloadState
 import com.example.data.model.Juz
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.ReadingBookmark
 import com.example.data.model.Surah
+import com.example.data.repository.AudioPlayerManager
+import com.example.data.repository.QuranAudioDownloadManager
 import com.example.data.repository.QuranRepository
+import com.example.ui.components.QuranMiniPlayer
 import com.example.ui.theme.AmiriFontFamily
 import com.example.ui.theme.IslamicEmerald
 import com.example.ui.theme.IslamicGold
+import com.example.ui.theme.IslamicGoldBright
 
 @Composable
 fun QuranScreen(
@@ -70,8 +82,16 @@ fun QuranScreen(
     bookmarks: List<ReadingBookmark>,
     onSelectSurah: (Int) -> Unit
 ) {
+    val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
+
+    val playbackState by AudioPlayerManager.playbackState.collectAsState()
+    val currentTrack by AudioPlayerManager.currentTrack.collectAsState()
+    val repeatMode by AudioPlayerManager.repeatMode.collectAsState()
+    val currentPositionMs by AudioPlayerManager.currentPositionMs.collectAsState()
+    val durationMs by AudioPlayerManager.durationMs.collectAsState()
+    val downloadStatuses by QuranAudioDownloadManager.downloadStatuses.collectAsState()
 
     val filteredSurahs = remember(searchQuery) {
         if (searchQuery.isBlank()) {
@@ -87,131 +107,248 @@ fun QuranScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("quran_screen")
-    ) {
-        // Search Bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .testTag("quran_search_field"),
-            placeholder = { Text(strings.searchSurah, fontSize = 14.sp) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Clear",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+    Box(modifier = Modifier.fillMaxSize().testTag("quran_screen")) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag("quran_search_field"),
+                placeholder = { Text(strings.searchSurah, fontSize = 14.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Clear",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                }
-            },
-            shape = RoundedCornerShape(16.dp),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = IslamicEmerald,
-                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                },
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = IslamicEmerald,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             )
-        )
 
-        // Tabs: Surahs, Juz, Bookmarks
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = IslamicEmerald,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = IslamicEmerald
+            // Tabs: Surahs, Juz, Bookmarks, Downloads
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = IslamicEmerald,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = IslamicEmerald
+                    )
+                }
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("${strings.surahsTab} (${QuranRepository.allSurahs.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
+                    modifier = Modifier.testTag("tab_surahs")
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("${strings.juzTab} (${QuranRepository.allJuz.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
+                    modifier = Modifier.testTag("tab_juz")
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("${strings.bookmarksTab} (${bookmarks.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
+                    modifier = Modifier.testTag("tab_bookmarks")
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text(strings.downloads, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
+                    modifier = Modifier.testTag("tab_downloads")
                 )
             }
-        ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("${strings.surahsTab} (${QuranRepository.allSurahs.size})", fontWeight = FontWeight.SemiBold) },
-                modifier = Modifier.testTag("tab_surahs")
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("${strings.juzTab} (${QuranRepository.allJuz.size})", fontWeight = FontWeight.SemiBold) },
-                modifier = Modifier.testTag("tab_juz")
-            )
-            Tab(
-                selected = selectedTab == 2,
-                onClick = { selectedTab = 2 },
-                text = { Text("${strings.bookmarksTab} (${bookmarks.size})", fontWeight = FontWeight.SemiBold) },
-                modifier = Modifier.testTag("tab_bookmarks")
-            )
-        }
 
-        when (selectedTab) {
-            0 -> {
-                // Surahs List
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Last read banner
-                    if (lastRead != null && searchQuery.isBlank()) {
-                        item {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSelectSurah(lastRead.surahNumber) }
-                                    .testTag("continue_reading_card"),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = IslamicEmerald)
-                            ) {
-                                Row(
+            val bottomPadding = if (currentTrack != null && playbackState != com.example.data.repository.PlaybackState.IDLE) 80.dp else 16.dp
+
+            when (selectedTab) {
+                0 -> {
+                    // Surahs List
+                    LazyColumn(
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomPadding),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // Last read banner
+                        if (lastRead != null && searchQuery.isBlank()) {
+                            item {
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .clickable { onSelectSurah(lastRead.surahNumber) }
+                                        .testTag("continue_reading_card"),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = IslamicEmerald)
                                 ) {
-                                    Column {
-                                        Text(
-                                            text = strings.lastRead,
-                                            color = IslamicGold,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "${lastRead.surahName} • Verse ${lastRead.ayahNumber}",
-                                            color = Color.White,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = strings.lastRead,
+                                                color = IslamicGold,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "${lastRead.surahName} • Verse ${lastRead.ayahNumber}",
+                                                color = Color.White,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = strings.continueReading,
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                                contentDescription = null,
+                                                tint = IslamicGold,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = strings.continueReading,
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                }
+                            }
+                        }
+
+                        items(filteredSurahs, key = { it.number }) { surah ->
+                            val isDownloaded = AvailableQaris.any { q ->
+                                downloadStatuses["${q.id}_${surah.number}"]?.state == DownloadState.COMPLETED ||
+                                QuranAudioDownloadManager.isSurahDownloaded(context, surah.number, q.id)
+                            }
+
+                            SurahRowItem(
+                                surah = surah,
+                                strings = strings,
+                                isDownloaded = isDownloaded,
+                                onClick = { onSelectSurah(surah.number) }
+                            )
+                        }
+                    }
+                }
+                1 -> {
+                    // Juz List
+                    LazyColumn(
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomPadding),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(QuranRepository.allJuz, key = { it.number }) { juz ->
+                            JuzRowItem(
+                                juz = juz,
+                                strings = strings,
+                                onClick = { onSelectSurah(juz.startSurahNumber) }
+                            )
+                        }
+                    }
+                }
+                2 -> {
+                    // Bookmarks List
+                    if (bookmarks.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Bookmark,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(56.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = strings.noBookmarksYet,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomPadding),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(bookmarks, key = { "${it.surahNumber}_${it.ayahNumber}_${it.timestamp}" }) { b ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onSelectSurah(b.surahNumber) }
+                                        .testTag("bookmark_item_${b.surahNumber}_${b.ayahNumber}"),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Bookmark,
+                                                contentDescription = null,
+                                                tint = IslamicGold,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Text(
+                                                    text = b.surahName,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 16.sp
+                                                )
+                                                Text(
+                                                    text = "Verse ${b.ayahNumber}",
+                                                    fontSize = 13.sp,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                             contentDescription = null,
-                                            tint = IslamicGold,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -219,106 +356,184 @@ fun QuranScreen(
                             }
                         }
                     }
+                }
+                3 -> {
+                    // Downloads Tab
+                    val downloadedList = QuranAudioDownloadManager.getDownloadedSurahsList(context)
+                    val totalBytesUsed = QuranAudioDownloadManager.getTotalDownloadedBytes(context)
 
-                    items(filteredSurahs, key = { it.number }) { surah ->
-                        SurahRowItem(
-                            surah = surah,
-                            strings = strings,
-                            onClick = { onSelectSurah(surah.number) }
-                        )
-                    }
-                }
-            }
-            1 -> {
-                // Juz List
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(QuranRepository.allJuz, key = { it.number }) { juz ->
-                        JuzRowItem(
-                            juz = juz,
-                            strings = strings,
-                            onClick = { onSelectSurah(juz.startSurahNumber) }
-                        )
-                    }
-                }
-            }
-            2 -> {
-                // Bookmarks List
-                if (bookmarks.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Bookmark,
-                                contentDescription = null,
-                                tint = IslamicGold,
-                                modifier = Modifier.size(54.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = strings.noBookmarksYet,
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomPadding),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(bookmarks, key = { "${it.surahNumber}_${it.ayahNumber}_${it.timestamp}" }) { b ->
+                        item {
                             Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSelectSurah(b.surahNumber) },
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = IslamicEmerald.copy(alpha = 0.1f))
                             ) {
                                 Row(
+                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(IslamicEmerald),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Folder,
+                                            contentDescription = null,
+                                            tint = IslamicGoldBright,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Column {
+                                        Text(
+                                            text = strings.storageUsed,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = QuranAudioDownloadManager.formatBytes(totalBytesUsed),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp,
+                                            color = IslamicEmerald
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (downloadedList.isEmpty()) {
+                            item {
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .padding(vertical = 40.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(
-                                            imageVector = Icons.Default.Bookmark,
+                                            imageVector = Icons.Default.DownloadDone,
                                             contentDescription = null,
-                                            tint = IslamicGold,
-                                            modifier = Modifier.size(24.dp)
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(52.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column {
-                                            Text(
-                                                text = b.surahName,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp
-                                            )
-                                            Text(
-                                                text = "Verse ${b.ayahNumber}",
-                                                fontSize = 13.sp,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = "No offline audio downloaded yet.",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Tap on any Surah to download for offline listening.",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(downloadedList, key = { "${it.second.id}_${it.first}" }) { (sNum, qari) ->
+                                val surah = QuranRepository.allSurahs.firstOrNull { it.number == sNum }
+                                if (surah != null) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { onSelectSurah(surah.number) },
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(CircleShape)
+                                                        .background(IslamicEmerald.copy(alpha = 0.12f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "${surah.number}",
+                                                        color = IslamicEmerald,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = surah.nameEnglish,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 15.sp
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Icon(
+                                                            imageVector = Icons.Default.OfflinePin,
+                                                            contentDescription = strings.offlineAudioReady,
+                                                            tint = IslamicEmerald,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = "${qari.name} • ${surah.ayahCount} ${strings.versesCount}",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                IconButton(
+                                                    onClick = {
+                                                        AudioPlayerManager.playAyah(
+                                                            surahNumber = surah.number,
+                                                            surahName = surah.nameEnglish,
+                                                            ayahNumber = 1,
+                                                            totalAyahs = surah.ayahCount,
+                                                            qari = qari
+                                                        )
+                                                    }
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.PlayArrow,
+                                                        contentDescription = strings.playAudio,
+                                                        tint = IslamicEmerald
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = {
+                                                        QuranAudioDownloadManager.deleteSurahDownload(context, surah.number, qari.id)
+                                                    }
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = strings.deleteDownload,
+                                                        tint = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
                                 }
                             }
                         }
@@ -326,6 +541,20 @@ fun QuranScreen(
                 }
             }
         }
+
+        // Docked Mini Player
+        QuranMiniPlayer(
+            currentTrack = currentTrack,
+            playbackState = playbackState,
+            repeatMode = repeatMode,
+            currentPositionMs = currentPositionMs,
+            durationMs = durationMs,
+            strings = strings,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            onExpand = {
+                currentTrack?.let { onSelectSurah(it.surahNumber) }
+            }
+        )
     }
 }
 
@@ -333,6 +562,7 @@ fun QuranScreen(
 fun SurahRowItem(
     surah: Surah,
     strings: LocalizedStrings,
+    isDownloaded: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
@@ -355,7 +585,7 @@ fun SurahRowItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // Octagram Number Badge
+                // Number Badge
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -375,10 +605,21 @@ fun SurahRowItem(
                 Spacer(modifier = Modifier.width(14.dp))
 
                 Column {
-                    Text(
-                        text = surah.nameEnglish,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = surah.nameEnglish,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        if (isDownloaded) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.OfflinePin,
+                                contentDescription = strings.offlineAudioReady,
+                                tint = IslamicEmerald,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "${if (surah.isMeccan) strings.meccan else strings.medinan} • ${surah.ayahCount} ${strings.versesCount}",

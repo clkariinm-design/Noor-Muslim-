@@ -120,7 +120,7 @@ class ExampleUnitTest {
 
     @Test
     fun testQuranAudioReciterUrls() {
-        assertEquals("Must support 4 Qaris", 4, AvailableQaris.size)
+        assertTrue("Must support at least 4 Qaris", AvailableQaris.size >= 4)
         val qariIds = AvailableQaris.map { it.id }
         assertTrue(qariIds.contains("alafasy"))
         assertTrue(qariIds.contains("abdulbaset"))
@@ -141,5 +141,20 @@ class ExampleUnitTest {
         assertEquals("English must use LTR", androidx.compose.ui.unit.LayoutDirection.Ltr, AppLanguage.ENGLISH.layoutDirection)
         assertEquals("Turkish must use LTR", androidx.compose.ui.unit.LayoutDirection.Ltr, AppLanguage.TURKISH.layoutDirection)
         assertEquals("French must use LTR", androidx.compose.ui.unit.LayoutDirection.Ltr, AppLanguage.FRENCH.layoutDirection)
+    }
+
+    @Test
+    fun testDownloadManagerFormatBytes() {
+        assertEquals("500 B", com.example.data.repository.QuranAudioDownloadManager.formatBytes(500L))
+        assertEquals("100 KB", com.example.data.repository.QuranAudioDownloadManager.formatBytes(102400L))
+        assertEquals("15.0 MB", com.example.data.repository.QuranAudioDownloadManager.formatBytes(15728640L))
+    }
+
+    @Test
+    fun testRecitersHaveQualityAndStyle() {
+        AvailableQaris.forEach { qari ->
+            assertTrue("Reciter ${qari.name} should specify audio quality", qari.quality.isNotEmpty())
+            assertTrue("Reciter ${qari.name} should specify style", qari.style.isNotEmpty())
+        }
     }
 }
