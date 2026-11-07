@@ -50,7 +50,9 @@ fun NoorMuslimApp() {
     val currentTrack by AudioPlayerManager.currentTrack.collectAsState()
     val isRepeatOne by AudioPlayerManager.isRepeatOne.collectAsState()
 
-    // Refresh prayer alarms whenever the selected city changes and on app launch.\n    LaunchedEffect(currentCity) { AdhanScheduler.scheduleAll(context, currentCity) }\n
+    // Refresh prayer alarms whenever the selected city changes and on app launch.
+    LaunchedEffect(currentCity) { AdhanScheduler.scheduleAll(context, currentCity) }
+
     val isDark = when (themeMode) {
         "LIGHT" -> false
         "DARK" -> true
