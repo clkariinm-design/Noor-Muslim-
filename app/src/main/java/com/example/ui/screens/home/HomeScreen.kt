@@ -396,7 +396,7 @@ fun HomeScreen(
             }
         }
 
-        // 4. QUICK ACCESS GRID (Quran, Qibla, Tasbeeh, Duas)
+        // Quick access for useful secondary tools. Quran and Qibla already have primary navigation tabs.
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
@@ -404,31 +404,6 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickAccessTile(
-                        icon = Icons.AutoMirrored.Filled.MenuBook,
-                        title = strings.navQuran,
-                        color = IslamicEmerald,
-                        modifier = Modifier.weight(1f),
-                        testTag = "quick_quran",
-                        onClick = { onNavigate(NoorNavDestination.QURAN) }
-                    )
-                    QuickAccessTile(
-                        icon = Icons.Filled.Explore,
-                        title = strings.navQibla,
-                        color = Color(0xFFC27803),
-                        modifier = Modifier.weight(1f),
-                        testTag = "quick_qibla",
-                        onClick = { onNavigate(NoorNavDestination.QIBLA) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -436,7 +411,7 @@ fun HomeScreen(
                     QuickAccessTile(
                         icon = Icons.Filled.TouchApp,
                         title = strings.navTasbeeh,
-                        color = Color(0xFF1B6B93),
+                        color = IslamicEmerald,
                         modifier = Modifier.weight(1f),
                         testTag = "quick_tasbeeh",
                         onClick = { onNavigate(NoorNavDestination.TASBEEH) }
@@ -444,7 +419,7 @@ fun HomeScreen(
                     QuickAccessTile(
                         icon = Icons.Filled.AutoAwesome,
                         title = strings.navDuas,
-                        color = Color(0xFF5D3891),
+                        color = IslamicGold,
                         modifier = Modifier.weight(1f),
                         testTag = "quick_duas",
                         onClick = { onNavigate(NoorNavDestination.DUAS) }
