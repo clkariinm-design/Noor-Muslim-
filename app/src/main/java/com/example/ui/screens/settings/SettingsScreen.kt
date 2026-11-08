@@ -1,5 +1,10 @@
 package com.example.ui.screens.settings
 
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -81,6 +86,12 @@ fun SettingsScreen(
     var arabicFontSize by remember { mutableFloatStateOf(appPreferences.getArabicFontSize()) }
     var translationFontSize by remember { mutableFloatStateOf(appPreferences.getTranslationFontSize()) }
     var prayerNotifs by remember { mutableStateOf(appPreferences.isPrayerNotificationsEnabled()) }
+    val systemContext = androidx.compose.ui.platform.LocalContext.current
+    val alarmManager = remember {
+        systemContext.getSystemService(android.content.Context.ALARM_SERVICE) as AlarmManager
+    }
+    val needsExactAlarmAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        !alarmManager.canScheduleExactAlarms()
 
     var selectedQariId by remember { mutableStateOf(appPreferences.getSelectedQariId()) }
     val currentQari = AvailableQaris.firstOrNull { it.id == selectedQariId } ?: AvailableQaris[0]
@@ -180,6 +191,19 @@ fun SettingsScreen(
                         )
                     }
                     if (prayerNotifs) {
+                        if (needsExactAlarmAccess) {
+                            TextButton(
+                                onClick = {
+                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                        data = Uri.parse("package:${systemContext.packageName}")
+                                    }
+                                    runCatching { systemContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Allow precise prayer-time alerts")
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         listOf(
                             PrayerType.FAJR,
