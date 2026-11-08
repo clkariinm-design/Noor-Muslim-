@@ -156,11 +156,11 @@ fun SettingsScreen(
                             )
                             Column {
                                 Text(
-                                    text = "Prayer Adhan",
+                                    text = strings.prayerReminders,
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                                 )
                                 Text(
-                                    text = if (prayerNotifs) "Choose which prayers play the Adhan" else "Prayer alerts are disabled",
+                                    text = if (prayerNotifs) strings.notificationsEnabled else strings.notificationsDisabled,
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
