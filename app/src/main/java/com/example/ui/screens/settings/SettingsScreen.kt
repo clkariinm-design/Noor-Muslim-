@@ -55,6 +55,7 @@ import com.example.data.model.CalculationMethod
 import com.example.data.model.JuristicMethod
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
+import com.example.data.model.PrayerType
 import com.example.ui.components.IslamicOrnamentCard
 import com.example.ui.screens.quran.ReciterSelectionDialog
 import com.example.ui.theme.AmiriFontFamily
@@ -67,7 +68,8 @@ fun SettingsScreen(
     currentLanguage: AppLanguage,
     appPreferences: AppPreferences,
     onLanguageChange: (AppLanguage) -> Unit,
-    onThemeChange: (String) -> Unit
+    onThemeChange: (String) -> Unit,
+    onAdhanSettingsChanged: () -> Unit
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -136,43 +138,81 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(16.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = null,
-                            tint = IslamicEmerald,
-                            modifier = Modifier.padding(end = 12.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = IslamicEmerald,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "Prayer Adhan",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                                Text(
+                                    text = if (prayerNotifs) "Choose which prayers play the Adhan" else "Prayer alerts are disabled",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = prayerNotifs,
+                            onCheckedChange = {
+                                prayerNotifs = it
+                                appPreferences.setPrayerNotificationsEnabled(it)
+                                onAdhanSettingsChanged()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = IslamicGold,
+                                checkedTrackColor = IslamicEmerald
+                            )
                         )
-                        Column {
-                            Text(
-                                text = strings.prayerReminders,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                            )
-                            Text(
-                                text = if (prayerNotifs) strings.notificationsEnabled else strings.notificationsDisabled,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    }
+                    if (prayerNotifs) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        listOf(
+                            PrayerType.FAJR,
+                            PrayerType.DHUHR,
+                            PrayerType.ASR,
+                            PrayerType.MAGHRIB,
+                            PrayerType.ISHA
+                        ).forEach { prayer ->
+                            var enabled by remember(prayer) {
+                                mutableStateOf(appPreferences.isAdhanEnabled(prayer))
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = prayer.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Switch(
+                                    checked = enabled,
+                                    onCheckedChange = {
+                                        enabled = it
+                                        appPreferences.setAdhanEnabled(prayer, it)
+                                        onAdhanSettingsChanged()
+                                    }
+                                )
+                            }
                         }
                     }
-                    Switch(
-                        checked = prayerNotifs,
-                        onCheckedChange = {
-                            prayerNotifs = it
-                            appPreferences.setPrayerNotificationsEnabled(it)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = IslamicGold,
-                            checkedTrackColor = IslamicEmerald
-                        )
-                    )
                 }
             }
         }
