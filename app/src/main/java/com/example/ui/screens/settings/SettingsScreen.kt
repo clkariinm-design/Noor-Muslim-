@@ -62,8 +62,6 @@ import com.example.data.local.AppPreferences
 import com.example.data.service.AdhanPlaybackService
 import com.example.data.model.AppLanguage
 import com.example.data.model.AvailableQaris
-import com.example.data.model.CalculationMethod
-import com.example.data.model.JuristicMethod
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
 import com.example.data.model.PrayerType
