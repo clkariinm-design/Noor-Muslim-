@@ -34,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -58,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.AppPreferences
+import com.example.data.service.AdhanPlaybackService
 import com.example.data.model.AppLanguage
 import com.example.data.model.AvailableQaris
 import com.example.data.model.CalculationMethod
@@ -251,6 +253,24 @@ fun SettingsScreen(
                                         onAdhanSettingsChanged()
                                     }
                                 )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { AdhanPlaybackService.playTest(systemContext, PrayerType.DHUHR) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Test Adhan")
+                            }
+                            OutlinedButton(
+                                onClick = { AdhanPlaybackService.stop(systemContext) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Stop")
                             }
                         }
                     }
