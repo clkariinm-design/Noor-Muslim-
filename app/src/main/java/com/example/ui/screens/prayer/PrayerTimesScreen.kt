@@ -3,9 +3,6 @@ package com.example.ui.screens.prayer
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,7 +33,6 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EditLocation
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
@@ -54,15 +50,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,12 +72,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.data.local.AppPreferences
-import com.example.data.service.AdhanPlaybackService
 import com.example.data.service.AdhanScheduler
 import com.example.data.location.GlobalLocationEngine
-import com.example.data.location.LocationData
 import com.example.data.location.LocationError
 import com.example.data.location.TimezoneCrossingEvent
 import com.example.data.model.CalculationMethod
