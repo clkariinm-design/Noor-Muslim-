@@ -262,53 +262,6 @@ object QuranRepository {
     private fun surahCacheFile(context: Context, surahNumber: Int): File =
         File(File(context.filesDir, "quran_cache"), "surah_${surahNumber}.json")
 
-    private val bundledPayloadLock = Any()
-
-    @Volatile
-    private var bundledPayloads: Map<Int, JSONObject>? = null
-
-    /**
-     * Converts the verbatim Tanzil asset into the same read-only payload shape used by
-     * the online parser. Ayah number 0 is the separately-listed basmalah marker and is
-     * omitted so each surah contains its canonical numbered ayahs only.
-     */
-    private fun bundledSurahPayload(context: Context, surahNumber: Int): JSONObject {
-        val payloads = bundledPayloads ?: synchronized(bundledPayloadLock) {
-            bundledPayloads ?: run {
-                val source = context.assets.open("quran_uthmani.json")
-                    .bufferedReader(Charsets.UTF_8)
-                    .use { JSONObject(it.readText()) }
-                val surahs = source.getJSONArray("surahs")
-                val parsed = mutableMapOf<Int, JSONObject>()
-
-                for (i in 0 until surahs.length()) {
-                    val surah = surahs.getJSONObject(i)
-                    val number = surah.getInt("number")
-                    val sourceAyahs = surah.getJSONArray("ayahs")
-                    val ayahs = JSONArray()
-                    for (j in 0 until sourceAyahs.length()) {
-                        val sourceAyah = sourceAyahs.getJSONObject(j)
-                        val ayahNumber = sourceAyah.getInt("number")
-                        if (ayahNumber > 0) {
-                            ayahs.put(
-                                JSONObject()
-                                    .put("numberInSurah", ayahNumber)
-                                    .put("text", sourceAyah.getString("text"))
-                            )
-                        }
-                    }
-
-                    val edition = JSONObject().put("identifier", "quran-uthmani")
-                    val data = JSONObject().put("edition", edition).put("ayahs", ayahs)
-                    parsed[number] = JSONObject().put("data", JSONArray().put(data))
-                }
-                parsed.toMap().also { bundledPayloads = it }
-            }
-        }
-        return payloads[surahNumber]
-            ?: throw IllegalStateException("Bundled Quran text is missing surah $surahNumber")
-    }
-
     private fun parseAyahsJson(jsonString: String, surahNumber: Int, selectedQari: Qari): List<Ayah> {
         val root = JSONObject(jsonString)
         val dataArray = root.getJSONArray("data")
