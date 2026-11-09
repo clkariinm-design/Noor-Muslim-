@@ -55,7 +55,10 @@ val AvailableQaris = listOf(
     Qari("husary", "Mahmoud Khalil Al-Husary", "محمود خليل الحصري", "ar.husary", "128 kbps", "Murattal"),
     Qari("shatri", "Abu Bakr Al-Shatri", "أبو بكر الشاطري", "ar.shaatree", "128 kbps", "Murattal"),
     Qari("hudhaify", "Ali Al-Hudhaify", "علي بن عبد الرحمن الحذيفي", "ar.hudhaify", "128 kbps", "Murattal"),
-    Qari("muaiqly", "Maher Al-Muaiqly", "ماهر المعيقلي", "ar.mahermuaiqly", "128 kbps", "Murattal")
+    Qari("muaiqly", "Maher Al-Muaiqly", "ماهر المعيقلي", "ar.mahermuaiqly", "128 kbps", "Murattal"),
+    Qari("minshawi", "Muhammad Siddiq Al-Minshawi", "محمد صديق المنشاوي", "ar.minshawi", "128 kbps", "Murattal"),
+    Qari("shuraim", "Saud Al-Shuraim", "سعود الشريم", "ar.shuraim", "128 kbps", "Murattal"),
+    Qari("muhammadayoub", "Muhammad Ayyoub", "محمد أيوب", "ar.muhammadayoub", "128 kbps", "Murattal")
 )
 
 enum class DownloadState {
