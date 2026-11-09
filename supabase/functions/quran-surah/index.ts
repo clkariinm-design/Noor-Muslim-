@@ -1,6 +1,81 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ALLOWED_EDITIONS = "quran-uthmani,en.sahih,so.abduh,tr.diyanet,fr.hamidullah";
+const QURANENC_TRANSLATIONS = [
+  {
+    key: "english_saheeh",
+    identifier: "english_saheeh",
+    language: "en",
+    name: "English Translation",
+    translator: "Saheeh International",
+    publisher: "Noor International Center",
+    version: "1.1.2",
+  },
+  {
+    key: "somali_yacob",
+    identifier: "somali_yacob",
+    language: "so",
+    name: "Somali Translation",
+    translator: "Abdullah Hasan Yaqoub",
+    publisher: "QuranEnc.com",
+    version: "1.0.27",
+  },
+  {
+    key: "turkish_rwwad",
+    identifier: "turkish_rwwad",
+    language: "tr",
+    name: "Turkish Translation",
+    translator: "Rowwad Translation Center",
+    publisher: "Rowwad Translation Center / QuranEnc.com",
+    version: "1.0.4",
+  },
+  {
+    key: "french_rashid",
+    identifier: "french_rashid",
+    language: "fr",
+    name: "French Translation",
+    translator: "Rachid Maach",
+    publisher: "QuranEnc.com",
+    version: "1.0.3",
+  },
+] as const;
+
+async function fetchQuranEncEdition(
+  surah: number,
+  translation: typeof QURANENC_TRANSLATIONS[number],
+): Promise<QuranEdition> {
+  const response = await fetch(
+    `https://quranenc.com/api/v1/translation/sura/${translation.key}/${surah}`,
+    { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12000) },
+  );
+  if (!response.ok) throw new Error(`QuranEnc ${translation.key} returned ${response.status}`);
+  const body = await response.json() as {
+    result?: Array<{ aya: number; translation: string; footnotes?: string }>;
+  };
+  if (!Array.isArray(body.result) || body.result.length === 0) {
+    throw new Error(`QuranEnc ${translation.key} returned no ayahs`);
+  }
+
+  return {
+    edition: {
+      identifier: translation.identifier,
+      language: translation.language,
+      name: translation.name,
+      englishName: translation.translator,
+      publisher: translation.publisher,
+      version: translation.version,
+      sourceName: "QuranEnc.com",
+      sourceUrl: "https://quranenc.com",
+      licenseTerms: "Republish verbatim; retain publisher/source, version and transcript information; do not modify, add or delete content.",
+      format: "text",
+      type: "translation",
+    },
+    ayahs: body.result.map((row) => ({
+      numberInSurah: Number(row.aya),
+      text: row.translation,
+      footnotes: row.footnotes ?? "",
+    })),
+  };
+}
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "public, max-age=900, s-maxage=3600",
@@ -129,23 +204,20 @@ Deno.serve(async (req: Request) => {
     // A complete database copy is authoritative; no upstream request is needed.
     payload = { code: 200, status: "OK", data: [] };
   } else {
-    try {
-      const upstream = await fetch(
-        `https://api.alquran.cloud/v1/surah/${surah}/editions/${ALLOWED_EDITIONS}`,
-        { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12000) },
-      );
-      if (!upstream.ok) throw new Error(`Upstream Quran API returned ${upstream.status}`);
-      payload = await upstream.json() as { code?: number; status?: string; data?: QuranEdition[] };
-      if (!Array.isArray(payload?.data)) throw new Error("Invalid upstream Quran response");
-    } catch (error) {
-      if (!databaseArabic) {
-        console.error("No complete Quran source available.", error);
-        return jsonResponse({ error: "Quran text service is temporarily unavailable" }, 502, {
-          "Cache-Control": "no-store",
-        });
-      }
-      payload = { code: 200, status: "OK", data: [] };
+    const translationResults = await Promise.allSettled(
+      QURANENC_TRANSLATIONS.map((translation) => fetchQuranEncEdition(surah, translation)),
+    );
+    const onlineTranslations = translationResults
+      .filter((result): result is PromiseFulfilledResult<QuranEdition> => result.status === "fulfilled")
+      .map((result) => result.value);
+
+    if (onlineTranslations.length === 0 && !databaseArabic) {
+      console.error("No complete Quran source available.");
+      return jsonResponse({ error: "Quran text service is temporarily unavailable" }, 502, {
+        "Cache-Control": "no-store",
+      });
     }
+    payload = { code: 200, status: "OK", data: onlineTranslations };
   }
 
   const editions = payload.data ?? [];
