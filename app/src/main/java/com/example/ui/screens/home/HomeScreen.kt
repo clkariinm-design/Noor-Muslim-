@@ -60,6 +60,13 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+private val HomeBackground = Color(0xFFF7FAFE)
+private val HomeWhite = Color(0xFFFFFFFF)
+private val HomeLightBlue = Color(0xFFEAF3FF)
+private val HomeBlue = Color(0xFF3478D4)
+private val HomeNavy = Color(0xFF18324F)
+private val HomeMuted = Color(0xFF6D7F95)
+
 @Composable
 fun HomeScreen(
     strings: LocalizedStrings,
@@ -110,7 +117,7 @@ fun HomeScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().testTag("home_screen"),
+        modifier = Modifier.fillMaxSize().background(HomeBackground).testTag("home_screen"),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -120,12 +127,12 @@ fun HomeScreen(
                     text = greeting,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = HomeNavy
                 )
                 Text(
                     text = "$dateText  •  ${currentCity.name}, ${currentCity.country}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = HomeMuted
                 )
             }
         }
@@ -135,22 +142,22 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth().clickable { onNavigate(NoorNavDestination.PRAYER) }
                     .testTag("next_prayer_card"),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = IslamicEmerald)
+                colors = CardDefaults.cardColors(containerColor = HomeLightBlue)
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(strings.nextPrayer, color = Color.White.copy(alpha = 0.82f), fontSize = 14.sp)
+                    Text(strings.nextPrayer, color = HomeBlue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(nextPrayerName, color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                            Text("${strings.prayerIn} $countdown", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
+                            Text(nextPrayerName, color = HomeNavy, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                            Text("${strings.prayerIn} $countdown", color = HomeMuted, fontSize = 13.sp)
                         }
                         Text(
                             prayers.nextPrayer.timeFormatted,
-                            color = IslamicGold,
+                            color = HomeBlue,
                             fontSize = 23.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -162,9 +169,9 @@ fun HomeScreen(
                         },
                         modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
                         color = IslamicGold,
-                        trackColor = Color.White.copy(alpha = 0.25f)
+                        trackColor = HomeBlue.copy(alpha = 0.14f)
                     )
-                    Text(strings.todayPrayerTimes, color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
+                    Text(strings.todayPrayerTimes, color = HomeMuted, fontSize = 12.sp)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -179,10 +186,10 @@ fun HomeScreen(
                                 PrayerType.ISHA -> strings.isha
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
+                                Text(label, color = HomeMuted, fontSize = 10.sp)
                                 Text(
                                     prayer.timeFormatted,
-                                    color = Color.White,
+                                    color = HomeNavy,
                                     fontSize = 11.sp,
                                     fontWeight = if (prayer.isNext) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -243,7 +250,7 @@ fun HomeScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = CardDefaults.cardColors(containerColor = HomeWhite)
             ) {
                 Column(
                     modifier = Modifier.padding(18.dp),
@@ -253,7 +260,7 @@ fun HomeScreen(
                         text = strings.dailyVerseTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = HomeBlue
                     )
                     Text(
                         text = DuasRepository.dailyInspiration.verseArabic,
@@ -262,7 +269,7 @@ fun HomeScreen(
                         fontSize = 23.sp,
                         lineHeight = 38.sp,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = HomeNavy
                     )
                     val translation = when (language) {
                         AppLanguage.SOMALI -> DuasRepository.dailyInspiration.verseSo
@@ -305,7 +312,7 @@ private fun QuickAccessTile(
         modifier = modifier.clickable(onClick = onClick).testTag(testTag),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -315,7 +322,7 @@ private fun QuickAccessTile(
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = IslamicEmerald,
+                tint = HomeBlue,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(Modifier.width(10.dp))
