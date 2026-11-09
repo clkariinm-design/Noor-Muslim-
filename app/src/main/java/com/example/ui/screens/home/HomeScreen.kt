@@ -58,7 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-private val HomeBackground = Color(0xFFF7FAFE)
+private val HomeBackground = Color(0xFFFBFDFF)
 private val HomeWhite = Color(0xFFFFFFFF)
 private val HomeLightBlue = Color(0xFFEAF3FF)
 private val HomeBlue = Color(0xFF3478D4)
@@ -275,14 +275,14 @@ fun HomeScreen(
                                     Text(
                                         text = label,
                                         color = if (prayer.isNext) HomeBlue else HomeMuted,
-                                        fontSize = 10.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = if (prayer.isNext) FontWeight.Bold else FontWeight.Normal,
                                         textAlign = TextAlign.Center
                                     )
                                     Text(
                                         text = prayer.timeFormatted,
                                         color = HomeNavy,
-                                        fontSize = 10.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = if (prayer.isNext) FontWeight.Bold else FontWeight.Medium,
                                         textAlign = TextAlign.Center
                                     )
@@ -394,24 +394,24 @@ private fun QuickAccessTile(
 ) {
     Card(
         modifier = modifier
-            .height(88.dp)
+            .height(104.dp)
             .clickable(onClick = onClick)
             .testTag(testTag),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = HomeWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(13.dp))
                     .background(HomeLightBlue),
                 contentAlignment = Alignment.Center
             ) {
@@ -419,15 +419,16 @@ private fun QuickAccessTile(
                     imageVector = icon,
                     contentDescription = title,
                     tint = HomeBlue,
-                    modifier = Modifier.size(21.dp)
+                    modifier = Modifier.size(23.dp)
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = title,
                 color = HomeNavy,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
             )
         }
     }
