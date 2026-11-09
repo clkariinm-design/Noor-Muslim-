@@ -254,12 +254,16 @@ object QuranRepository {
         return try {
             val data = JSONObject(file.readText(Charsets.UTF_8)).getJSONArray("data")
             val required = listOf("english_saheeh", "somali_yacob", "turkish_rwwad", "french_rashid")
-            val present = mutableSetOf<String>()
+            val expectedAyahs = allSurahs.first { it.number == surahNumber }.ayahCount
+            val complete = mutableSetOf<String>()
             for (i in 0 until data.length()) {
-                val identifier = data.getJSONObject(i).getJSONObject("edition").optString("identifier")
-                if (identifier in required) present.add(identifier)
+                val edition = data.getJSONObject(i)
+                val identifier = edition.getJSONObject("edition").optString("identifier")
+                if (identifier in required && edition.optJSONArray("ayahs")?.length() == expectedAyahs) {
+                    complete.add(identifier)
+                }
             }
-            present.containsAll(required)
+            complete.containsAll(required)
         } catch (_: Exception) {
             false
         }
