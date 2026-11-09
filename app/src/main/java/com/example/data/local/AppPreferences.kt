@@ -71,6 +71,12 @@ class AppPreferences(context: Context) {
         _languageFlow.value = lang
     }
 
+    // First-launch onboarding
+    fun hasSeenWelcome(): Boolean = prefs.getBoolean("key_has_seen_welcome", false)
+    fun setHasSeenWelcome(seen: Boolean) {
+        prefs.edit().putBoolean("key_has_seen_welcome", seen).apply()
+    }
+
     // Theme: "SYSTEM", "LIGHT", "DARK"
     fun getThemeMode(): String = prefs.getString("key_theme", "SYSTEM") ?: "SYSTEM"
     fun setThemeMode(mode: String) {
