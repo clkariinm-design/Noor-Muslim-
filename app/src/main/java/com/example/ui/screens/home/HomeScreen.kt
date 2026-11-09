@@ -53,8 +53,6 @@ import com.example.data.repository.CurrentPlayingTrack
 import com.example.data.repository.PrayerTimesCalculator
 import com.example.ui.components.NoorNavDestination
 import com.example.ui.theme.AmiriFontFamily
-import com.example.ui.theme.IslamicEmerald
-import com.example.ui.theme.IslamicGold
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -168,7 +166,7 @@ fun HomeScreen(
                             ((total - prayers.remainingMillis).coerceIn(0f, total)) / total
                         },
                         modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
-                        color = IslamicGold,
+                        color = HomeBlue,
                         trackColor = HomeBlue.copy(alpha = 0.14f)
                     )
                     Text(strings.todayPrayerTimes, color = HomeMuted, fontSize = 12.sp)
@@ -311,7 +309,7 @@ private fun QuickAccessTile(
     Card(
         modifier = modifier.clickable(onClick = onClick).testTag(testTag),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = HomeWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
