@@ -319,7 +319,7 @@ fun SurahDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
-                    // The bundled Uthmani text already includes each surah's basmala where applicable.
+                    // Quran text is fetched online from the Noor Muslim Quran service.
 
                     // Ayah Items
                     items(ayahs, key = { it.numberInSurah }) { ayah ->
