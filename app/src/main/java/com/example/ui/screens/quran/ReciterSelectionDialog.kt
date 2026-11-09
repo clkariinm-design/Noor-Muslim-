@@ -48,6 +48,7 @@ import com.example.ui.theme.IslamicGoldBright
 fun ReciterSelectionDialog(
     selectedQariId: String,
     strings: LocalizedStrings,
+    reciters: List<Qari> = AvailableQaris,
     onSelectQari: (Qari) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -68,7 +69,7 @@ fun ReciterSelectionDialog(
                     .testTag("reciters_list"),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(AvailableQaris, key = { it.id }) { qari ->
+                items(reciters, key = { it.id }) { qari ->
                     val isSelected = qari.id == selectedQariId
 
                     Card(
