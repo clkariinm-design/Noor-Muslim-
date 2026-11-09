@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -54,6 +55,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppLanguage
+import com.example.data.model.AvailableQaris
+import com.example.data.model.Qari
 import com.example.data.model.Juz
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.ReadingBookmark
@@ -72,11 +75,15 @@ fun QuranScreen(
     language: AppLanguage,
     lastRead: ReadingBookmark?,
     bookmarks: List<ReadingBookmark>,
-    onSelectSurah: (Int) -> Unit
+    onSelectSurah: (Int) -> Unit,
+    selectedQariId: String,
+    onReciterSelected: (Qari) -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
+    var showReciterDialog by remember { mutableStateOf(false) }
+    val selectedQari = AvailableQaris.firstOrNull { it.id == selectedQariId } ?: AvailableQaris[0]
 
     val playbackState by AudioPlayerManager.playbackState.collectAsState()
     val currentTrack by AudioPlayerManager.currentTrack.collectAsState()
@@ -100,6 +107,35 @@ fun QuranScreen(
 
     Box(modifier = Modifier.fillMaxSize().testTag("quran_screen")) {
         Column(modifier = Modifier.fillMaxSize()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clickable { showReciterDialog = true }
+                    .testTag("quran_reciter_selector"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RecordVoiceOver,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Selected reciter", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(selectedQari.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(selectedQari.subName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("Change", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                }
+            }
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
@@ -412,6 +448,15 @@ fun QuranScreen(
         }
 
         // Docked Mini Player
+        if (showReciterDialog) {
+            ReciterSelectionDialog(
+                selectedQariId = selectedQari.id,
+                strings = strings,
+                onSelectQari = onReciterSelected,
+                onDismiss = { showReciterDialog = false }
+            )
+        }
+
         QuranMiniPlayer(
             currentTrack = currentTrack,
             playbackState = playbackState,
