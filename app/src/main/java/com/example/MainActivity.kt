@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.data.repository.AudioPlayerManager
 import com.example.data.repository.QuranAudioDownloadManager
+import com.example.data.repository.QuranTextPrefetchWorker
 import com.example.ui.NoorMuslimApp
 
 class MainActivity : ComponentActivity() {
