@@ -9,6 +9,7 @@ import com.example.data.repository.QuranAudioDownloadManager
 import com.example.data.repository.QuranTextPrefetchWorker
 import com.example.data.service.AdhanScheduler
 import com.example.ui.NoorMuslimApp
+import com.example.update.MandatoryUpdateGate
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,7 +21,9 @@ class MainActivity : ComponentActivity() {
         AdhanScheduler.scheduleAll(applicationContext)
         enableEdgeToEdge()
         setContent {
-            NoorMuslimApp()
+            MandatoryUpdateGate {
+                NoorMuslimApp()
+            }
         }
     }
 }
