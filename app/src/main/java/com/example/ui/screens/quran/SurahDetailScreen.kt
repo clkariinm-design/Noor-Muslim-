@@ -81,6 +81,7 @@ import com.example.data.model.Ayah
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
 import com.example.data.repository.AudioPlayerManager
+import com.example.data.repository.QuranAudioDownloadManager
 import com.example.data.repository.CurrentPlayingTrack
 import com.example.data.repository.PlaybackState
 import com.example.data.repository.QuranRepository
@@ -130,6 +131,9 @@ fun SurahDetailScreen(
         mutableStateOf(QuranRepository.isSurahCached(context, surahNumber))
     }
     var isSavingSurah by remember { mutableStateOf(false) }
+    var isAudioSaved by remember(surahNumber, selectedQari.id) {
+        mutableStateOf(QuranAudioDownloadManager.isSurahDownloaded(context, surahNumber, selectedQari.id))
+    }
 
     var arabicFontSize by remember { mutableStateOf(appPreferences.getArabicFontSize()) }
     var translationFontSize by remember { mutableStateOf(appPreferences.getTranslationFontSize()) }
@@ -235,6 +239,18 @@ fun SurahDetailScreen(
                         },
                         fontSize = 11.sp
                     )
+                }
+
+                TextButton(
+                    onClick = {
+                        if (!isAudioSaved) {
+                            QuranAudioDownloadManager.downloadSurah(context, surahNumber, selectedQari)
+                            Toast.makeText(context, "Audio download started", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = !isAudioSaved
+                ) {
+                    Text(if (isAudioSaved) "Audio saved" else "Download audio", fontSize = 10.sp)
                 }
 
                 // Reciter selection button
