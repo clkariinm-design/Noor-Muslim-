@@ -78,7 +78,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(30_000)
+            delay(1_000)
             currentTime = Calendar.getInstance()
         }
     }
