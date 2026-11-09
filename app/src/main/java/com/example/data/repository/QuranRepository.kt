@@ -172,8 +172,9 @@ object QuranRepository {
     private val memoryCache = mutableMapOf<Int, List<Ayah>>()
 
     /**
-     * Quran reading is online-only. The Arabic text and translations are fetched
-     * from the Noor Muslim Supabase Edge Function; no bundled Quran text fallback exists.
+     * Offline-first Quran reading. A validated network payload is cached privately;
+     * if the service is unavailable, the bundled Tanzil Uthmani text is used immediately.
+     * Translations are available when supplied by the online payload; the bundled asset is Arabic-only.
      */
     suspend fun getSurahAyahs(
         context: Context,
@@ -222,7 +223,13 @@ object QuranRepository {
         val target = surahCacheFile(context, surahNumber)
         if (target.isFile && target.length() > 0L) return@withContext
 
-        val payload = com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+        // Prefer the online payload (including available translations), but never block
+        // Quran reading when the user is offline: the verified Arabic text ships in assets.
+        val payload = try {
+            com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+        } catch (_: Exception) {
+            bundledSurahPayload(context, surahNumber)
+        }
         val validated = parseAyahsJson(payload.toString(), surahNumber, AvailableQaris[0])
         check(validated.size == surah.ayahCount) {
             "Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${validated.size}"
@@ -245,6 +252,53 @@ object QuranRepository {
 
     private fun surahCacheFile(context: Context, surahNumber: Int): File =
         File(File(context.filesDir, "quran_cache"), "surah_${surahNumber}.json")
+
+    private val bundledPayloadLock = Any()
+
+    @Volatile
+    private var bundledPayloads: Map<Int, JSONObject>? = null
+
+    /**
+     * Converts the verbatim Tanzil asset into the same read-only payload shape used by
+     * the online parser. Ayah number 0 is the separately-listed basmalah marker and is
+     * omitted so each surah contains its canonical numbered ayahs only.
+     */
+    private fun bundledSurahPayload(context: Context, surahNumber: Int): JSONObject {
+        val payloads = bundledPayloads ?: synchronized(bundledPayloadLock) {
+            bundledPayloads ?: run {
+                val source = context.assets.open("quran_uthmani.json")
+                    .bufferedReader(Charsets.UTF_8)
+                    .use { JSONObject(it.readText()) }
+                val surahs = source.getJSONArray("surahs")
+                val parsed = mutableMapOf<Int, JSONObject>()
+
+                for (i in 0 until surahs.length()) {
+                    val surah = surahs.getJSONObject(i)
+                    val number = surah.getInt("number")
+                    val sourceAyahs = surah.getJSONArray("ayahs")
+                    val ayahs = JSONArray()
+                    for (j in 0 until sourceAyahs.length()) {
+                        val sourceAyah = sourceAyahs.getJSONObject(j)
+                        val ayahNumber = sourceAyah.getInt("number")
+                        if (ayahNumber > 0) {
+                            ayahs.put(
+                                JSONObject()
+                                    .put("numberInSurah", ayahNumber)
+                                    .put("text", sourceAyah.getString("text"))
+                            )
+                        }
+                    }
+
+                    val edition = JSONObject().put("identifier", "quran-uthmani")
+                    val data = JSONObject().put("edition", edition).put("ayahs", ayahs)
+                    parsed[number] = JSONObject().put("data", JSONArray().put(data))
+                }
+                parsed.toMap().also { bundledPayloads = it }
+            }
+        }
+        return payloads[surahNumber]
+            ?: throw IllegalStateException("Bundled Quran text is missing surah $surahNumber")
+    }
 
     private fun parseAyahsJson(jsonString: String, surahNumber: Int, selectedQari: Qari): List<Ayah> {
         val root = JSONObject(jsonString)
