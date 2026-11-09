@@ -38,6 +38,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -83,7 +84,13 @@ fun QuranScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var showReciterDialog by remember { mutableStateOf(false) }
-    val selectedQari = AvailableQaris.firstOrNull { it.id == selectedQariId } ?: AvailableQaris[0]
+    var availableQaris by remember { mutableStateOf(AvailableQaris) }
+    val selectedQari = availableQaris.firstOrNull { it.id == selectedQariId } ?: AvailableQaris[0]
+
+    LaunchedEffect(Unit) {
+        runCatching { QuranRepository.getAvailableQarisFromBackend() }
+            .onSuccess { availableQaris = it }
+    }
 
     val playbackState by AudioPlayerManager.playbackState.collectAsState()
     val currentTrack by AudioPlayerManager.currentTrack.collectAsState()
@@ -452,6 +459,7 @@ fun QuranScreen(
             ReciterSelectionDialog(
                 selectedQariId = selectedQari.id,
                 strings = strings,
+                reciters = availableQaris,
                 onSelectQari = onReciterSelected,
                 onDismiss = { showReciterDialog = false }
             )
