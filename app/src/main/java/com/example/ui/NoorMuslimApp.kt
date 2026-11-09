@@ -98,8 +98,8 @@ fun NoorMuslimApp() {
                 else -> null
             }
             val noticeMessage = when {
-                config?.maintenanceEnabled == true -> config.maintenanceMessage
-                config?.announcementEnabled == true -> config.announcementMessage
+                config?.maintenanceEnabled == true -> config?.maintenanceMessage
+                config?.announcementEnabled == true -> config?.announcementMessage
                 else -> null
             }
             if (!remoteNoticeDismissed && noticeTitle != null && !noticeMessage.isNullOrBlank()) {
