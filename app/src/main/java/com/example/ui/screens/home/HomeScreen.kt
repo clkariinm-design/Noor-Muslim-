@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,7 +63,7 @@ private val HomeWhite = Color(0xFFFFFFFF)
 private val HomeLightBlue = Color(0xFFEAF3FF)
 private val HomeBlue = Color(0xFF3478D4)
 private val HomeNavy = Color(0xFF18324F)
-private val HomeMuted = Color(0xFF6D7F95)
+private val HomeMuted = Color(0xFF71839A)
 
 @Composable
 fun HomeScreen(
@@ -113,142 +113,235 @@ fun HomeScreen(
     val dateText = remember(currentTime.get(Calendar.DAY_OF_YEAR)) {
         SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(currentTime.time)
     }
+    val dailyTranslation = when (language) {
+        AppLanguage.SOMALI -> DuasRepository.dailyInspiration.verseSo
+        AppLanguage.ARABIC -> ""
+        AppLanguage.ENGLISH -> DuasRepository.dailyInspiration.verseEn
+        AppLanguage.TURKISH -> DuasRepository.dailyInspiration.verseTr
+        AppLanguage.FRENCH -> DuasRepository.dailyInspiration.verseFr
+    }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(HomeBackground).testTag("home_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(HomeBackground)
+            .testTag("home_screen"),
+        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 30.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = greeting,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = HomeNavy
-                )
-                Text(
-                    text = "$dateText  •  ${currentCity.name}, ${currentCity.country}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HomeMuted
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(HomeLightBlue),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = null,
+                        tint = HomeBlue,
+                        modifier = Modifier.size(25.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = "Noor Muslim",
+                        color = HomeNavy,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "$dateText  •  ${currentCity.name}",
+                        color = HomeMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
+            Spacer(Modifier.height(18.dp))
+            Text(
+                text = greeting,
+                color = HomeNavy,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         item {
             Card(
-                modifier = Modifier.fillMaxWidth().clickable { onNavigate(NoorNavDestination.PRAYER) }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigate(NoorNavDestination.PRAYER) }
                     .testTag("next_prayer_card"),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = HomeLightBlue)
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = HomeLightBlue),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(strings.nextPrayer, color = HomeBlue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(nextPrayerName, color = HomeNavy, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                            Text("${strings.prayerIn} $countdown", color = HomeMuted, fontSize = 13.sp)
-                        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Text(
-                            prayers.nextPrayer.timeFormatted,
+                            text = strings.nextPrayer,
                             color = HomeBlue,
-                            fontSize = 23.sp,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = nextPrayerName,
+                            color = HomeNavy,
+                            fontSize = 27.sp,
                             fontWeight = FontWeight.Bold
                         )
+                        Text(
+                            text = "${strings.prayerIn} $countdown",
+                            color = HomeMuted,
+                            fontSize = 13.sp
+                        )
                     }
-                    LinearProgressIndicator(
-                        progress = {
-                            val total = 6 * 60 * 60 * 1000f
-                            ((total - prayers.remainingMillis).coerceIn(0f, total)) / total
-                        },
-                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
-                        color = HomeBlue,
-                        trackColor = HomeBlue.copy(alpha = 0.14f)
-                    )
-                    Text(strings.todayPrayerTimes, color = HomeMuted, fontSize = 12.sp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        prayers.asList().forEach { prayer ->
-                            val label = when (prayer.type) {
-                                PrayerType.FAJR -> strings.fajr
-                                PrayerType.SUNRISE -> strings.sunrise
-                                PrayerType.DHUHR -> strings.dhuhr
-                                PrayerType.ASR -> strings.asr
-                                PrayerType.MAGHRIB -> strings.maghrib
-                                PrayerType.ISHA -> strings.isha
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(label, color = HomeMuted, fontSize = 10.sp)
-                                Text(
-                                    prayer.timeFormatted,
-                                    color = HomeNavy,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (prayer.isNext) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(CircleShape)
+                                .background(HomeWhite),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AccessTime,
+                                contentDescription = null,
+                                tint = HomeBlue,
+                                modifier = Modifier.size(27.dp)
+                            )
                         }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = prayers.nextPrayer.timeFormatted,
+                            color = HomeBlue,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
 
         item {
-            Text(
-                text = strings.quickAccess,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickAccessTile(
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
-                    title = strings.navQuran,
-                    modifier = Modifier.weight(1f),
-                    testTag = "quick_quran",
-                    onClick = { onNavigate(NoorNavDestination.QURAN) }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = strings.todayPrayerTimes,
+                    color = HomeNavy,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
-                QuickAccessTile(
-                    icon = Icons.Filled.AccessTime,
-                    title = strings.navPrayer,
-                    modifier = Modifier.weight(1f),
-                    testTag = "quick_prayer",
-                    onClick = { onNavigate(NoorNavDestination.PRAYER) }
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = HomeWhite),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 15.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        prayers.asList()
+                            .filter { it.type != PrayerType.SUNRISE }
+                            .forEach { prayer ->
+                                val label = when (prayer.type) {
+                                    PrayerType.FAJR -> strings.fajr
+                                    PrayerType.SUNRISE -> strings.sunrise
+                                    PrayerType.DHUHR -> strings.dhuhr
+                                    PrayerType.ASR -> strings.asr
+                                    PrayerType.MAGHRIB -> strings.maghrib
+                                    PrayerType.ISHA -> strings.isha
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (prayer.isNext) HomeBlue else HomeMuted,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (prayer.isNext) FontWeight.Bold else FontWeight.Normal,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = prayer.timeFormatted,
+                                        color = HomeNavy,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (prayer.isNext) FontWeight.Bold else FontWeight.Medium,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                    }
+                }
             }
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickAccessTile(
-                    icon = Icons.Filled.Explore,
-                    title = strings.navQibla,
-                    modifier = Modifier.weight(1f),
-                    testTag = "quick_qibla",
-                    onClick = { onNavigate(NoorNavDestination.QIBLA) }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = strings.quickAccess,
+                    color = HomeNavy,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
-                QuickAccessTile(
-                    icon = Icons.Filled.AutoAwesome,
-                    title = strings.navDuas,
-                    modifier = Modifier.weight(1f),
-                    testTag = "quick_duas",
-                    onClick = { onNavigate(NoorNavDestination.DUAS) }
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    QuickAccessTile(
+                        icon = Icons.AutoMirrored.Filled.MenuBook,
+                        title = strings.navQuran,
+                        modifier = Modifier.weight(1f),
+                        testTag = "quick_quran",
+                        onClick = { onNavigate(NoorNavDestination.QURAN) }
+                    )
+                    QuickAccessTile(
+                        icon = Icons.Filled.Explore,
+                        title = strings.navQibla,
+                        modifier = Modifier.weight(1f),
+                        testTag = "quick_qibla",
+                        onClick = { onNavigate(NoorNavDestination.QIBLA) }
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    QuickAccessTile(
+                        icon = Icons.Filled.AutoAwesome,
+                        title = strings.navDuas,
+                        modifier = Modifier.weight(1f),
+                        testTag = "quick_duas",
+                        onClick = { onNavigate(NoorNavDestination.DUAS) }
+                    )
+                    QuickAccessTile(
+                        icon = Icons.Filled.AccessTime,
+                        title = strings.navPrayer,
+                        modifier = Modifier.weight(1f),
+                        testTag = "quick_prayer",
+                        onClick = { onNavigate(NoorNavDestination.PRAYER) }
+                    )
+                }
             }
         }
 
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = HomeWhite)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = HomeWhite),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(18.dp),
@@ -256,9 +349,9 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = strings.dailyVerseTitle,
+                        color = HomeBlue,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = HomeBlue
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = DuasRepository.dailyInspiration.verseArabic,
@@ -269,20 +362,13 @@ fun HomeScreen(
                         textAlign = TextAlign.Center,
                         color = HomeNavy
                     )
-                    val translation = when (language) {
-                        AppLanguage.SOMALI -> DuasRepository.dailyInspiration.verseSo
-                        AppLanguage.ARABIC -> ""
-                        AppLanguage.ENGLISH -> DuasRepository.dailyInspiration.verseEn
-                        AppLanguage.TURKISH -> DuasRepository.dailyInspiration.verseTr
-                        AppLanguage.FRENCH -> DuasRepository.dailyInspiration.verseFr
-                    }
-                    if (translation.isNotBlank()) {
+                    if (dailyTranslation.isNotBlank()) {
                         Text(
-                            text = translation,
+                            text = dailyTranslation,
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = HomeMuted
                         )
                     }
                     Text(
@@ -290,7 +376,7 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.End,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = HomeMuted
                     )
                 }
             }
@@ -300,32 +386,46 @@ fun HomeScreen(
 
 @Composable
 private fun QuickAccessTile(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     modifier: Modifier = Modifier,
     testTag: String,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.clickable(onClick = onClick).testTag(testTag),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .height(88.dp)
+            .clickable(onClick = onClick)
+            .testTag(testTag),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = HomeWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = HomeBlue,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(HomeLightBlue),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = HomeBlue,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
             Spacer(Modifier.width(10.dp))
             Text(
                 text = title,
+                color = HomeNavy,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
