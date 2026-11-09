@@ -344,7 +344,7 @@ fun HomeScreen(
                     QuickTile(Icons.Filled.TouchApp, strings.navTasbeeh, Color(0xFF287A91), Modifier.weight(1f)) {
                         onNavigate(NoorNavDestination.TASBEEH)
                     }
-                    QuickTile(Icons.AutoAwesome, strings.navDuas, Color(0xFF7454A5), Modifier.weight(1f)) {
+                    QuickTile(Icons.Filled.AutoAwesome, strings.navDuas, Color(0xFF7454A5), Modifier.weight(1f)) {
                         onNavigate(NoorNavDestination.DUAS)
                     }
                 }
