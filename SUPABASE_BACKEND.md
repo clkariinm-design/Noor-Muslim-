@@ -12,7 +12,7 @@ The Android API wrapper is `SupabaseQuranApi`. Quran reading calls the public `q
 
 ## Database
 
-The live database has six tables: `quran_surahs` (114 surahs), `quran_ayahs` (6,236 primary Uthmani ayahs), `quran_reciters` (10 catalogue entries), `quran_translations` (English/Somali/Turkish/French edition metadata), `quran_ayah_translations` (licensed text keyed by edition/surah/ayah), and `quran_audio_assets` (per-ayah or per-surah audio metadata). The `quran-surah` Edge Function prefers a complete surah from `quran_ayahs`, uses complete translation rows when present, and falls back to QuranEnc.com for translation editions missing from the database.
+The live database has six tables: `quran_surahs` (114 surahs), `quran_ayahs` (6,236 primary Uthmani ayahs), `quran_reciters` (7 active, verified reciters; older unverified entries are inactive), `quran_translations` (English/Somali/Turkish/French edition metadata), `quran_ayah_translations` (licensed text keyed by edition/surah/ayah), and `quran_audio_assets` (per-ayah or per-surah audio metadata). The `quran-surah` Edge Function prefers a complete surah from `quran_ayahs`, uses complete translation rows when present, and falls back to QuranEnc.com for translation editions missing from the database.
 
 All five tables have RLS enabled. Anonymous and authenticated clients can only read active catalogue rows. No public write policy exists. The Supabase Security Advisor returned no findings after initial schema setup.
 
