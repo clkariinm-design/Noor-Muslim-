@@ -50,6 +50,13 @@ class QuranTextPrefetchWorker(
             enqueueBatch(context.applicationContext, 1)
         }
 
+        fun cancelPending(context: Context) {
+            val manager = WorkManager.getInstance(context.applicationContext)
+            for (surah in 1..114) {
+                manager.cancelUniqueWork(UNIQUE_PREFIX + surah)
+            }
+        }
+
         private fun enqueueBatch(context: Context, startSurah: Int) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
