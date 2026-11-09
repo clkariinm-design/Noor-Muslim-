@@ -329,7 +329,7 @@ fun QiblaScreen(
                         center.y - radius * cos(rad).toFloat()
                     )
                     drawLine(
-                        color = if (isMajor) Color(0xFFD4AF37) else Color.Gray.copy(alpha = 0.4f),
+                        color = if (isMajor) Color(0xFF4F8CCB) else Color.Gray.copy(alpha = 0.4f),
                         start = startOffset,
                         end = endOffset,
                         strokeWidth = if (isMajor) 3f else 1.5f
