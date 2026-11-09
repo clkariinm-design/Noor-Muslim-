@@ -133,7 +133,7 @@ fun QuranScreen(
                         Text(selectedQari.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text(selectedQari.subName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("Change", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    Text(strings.selectReciter, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             }
             // Search Bar
