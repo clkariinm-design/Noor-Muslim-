@@ -33,6 +33,7 @@ import com.example.ui.screens.quran.QuranScreen
 import com.example.ui.screens.quran.SurahDetailScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.tasbeeh.TasbeehScreen
+import com.example.ui.screens.tools.ToolsScreen
 import com.example.ui.theme.NoorMuslimTheme
 
 @Composable
@@ -85,6 +86,7 @@ fun NoorMuslimApp() {
                             NoorNavDestination.HOME -> strings.appName
                             NoorNavDestination.QURAN -> strings.holyQuran
                             NoorNavDestination.PRAYER -> strings.todayPrayerTimes
+                            NoorNavDestination.TOOLS -> "Tools"
                             NoorNavDestination.QIBLA -> strings.qiblaCompass
                             NoorNavDestination.TASBEEH -> strings.digitalTasbeeh
                             NoorNavDestination.DUAS -> strings.dailyDuas
@@ -143,6 +145,7 @@ fun NoorMuslimApp() {
                                 bookmarks = bookmarks,
                                 onSelectSurah = { surahNum -> viewingSurahNumber = surahNum }
                             )
+                            NoorNavDestination.TOOLS -> ToolsScreen(onNavigate = { destination -> currentDestination = destination })
                             NoorNavDestination.PRAYER -> PrayerTimesScreen(
                                 strings = strings,
                                 currentCity = currentCity,
