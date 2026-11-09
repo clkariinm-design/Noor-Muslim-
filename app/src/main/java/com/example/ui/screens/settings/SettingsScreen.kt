@@ -1,5 +1,9 @@
 package com.example.ui.screens.settings
 
+import android.Manifest
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -47,11 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.AppPreferences
+import com.example.data.location.GlobalLocationEngine
+import com.example.data.model.CityLocation
 import com.example.data.model.AppLanguage
 import com.example.data.model.AvailableQaris
 import com.example.data.model.CalculationMethod
@@ -70,7 +78,8 @@ fun SettingsScreen(
     currentLanguage: AppLanguage,
     appPreferences: AppPreferences,
     onLanguageChange: (AppLanguage) -> Unit,
-    onThemeChange: (String) -> Unit
+    onThemeChange: (String) -> Unit,
+    currentCity: CityLocation
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -78,6 +87,42 @@ fun SettingsScreen(
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.values.any { it }) {
+            GlobalLocationEngine.fetchGpsLocation(
+                context = context,
+                onSuccess = {
+                    appPreferences.saveLocation(it)
+                    Toast.makeText(context, "${it.name}, ${it.country}", Toast.LENGTH_LONG).show()
+                },
+                onError = { Toast.makeText(context, it.message, Toast.LENGTH_LONG).show() }
+            )
+        } else {
+            Toast.makeText(context, "Location permission was not granted.", Toast.LENGTH_LONG).show()
+        }
+    }
+    val requestCurrentLocation = {
+        if (GlobalLocationEngine.hasLocationPermission(context)) {
+            GlobalLocationEngine.fetchGpsLocation(
+                context = context,
+                onSuccess = {
+                    appPreferences.saveLocation(it)
+                    Toast.makeText(context, "${it.name}, ${it.country}", Toast.LENGTH_LONG).show()
+                },
+                onError = { Toast.makeText(context, it.message, Toast.LENGTH_LONG).show() }
+            )
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
 
     var themeMode by remember { mutableStateOf(appPreferences.getThemeMode()) }
     var arabicFontSize by remember { mutableFloatStateOf(appPreferences.getArabicFontSize()) }
@@ -105,7 +150,18 @@ fun SettingsScreen(
             )
         }
 
-        // 2. Appearance & Theme Mode
+        // 2. Current device location
+        item {
+            SettingsCard(
+                icon = Icons.Default.LocationOn,
+                title = "Location",
+                subtitle = "${currentCity.name}, ${currentCity.country}",
+                testTag = "setting_location",
+                onClick = requestCurrentLocation
+            )
+        }
+
+        // 3. Appearance & Theme Mode
         item {
             val themeLabel = when (themeMode) {
                 "LIGHT" -> strings.themeLight
@@ -280,7 +336,7 @@ fun SettingsScreen(
             title = { Text(strings.language, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    AppLanguage.entries.forEach { lang ->
+                    listOf(AppLanguage.ENGLISH, AppLanguage.ARABIC).forEach { lang ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
