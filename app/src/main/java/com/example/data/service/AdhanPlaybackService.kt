@@ -6,10 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -26,40 +26,19 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 /**
- * Foreground playback for Adhan. Audio is cached silently in app-private storage;
- * when not cached yet, ExoPlayer streams the licensed Archive.org source and a
- * background worker stores a local copy for later offline playback.
+ * Dedicated foreground playback service for the five daily Adhans.
+ * The player is created only after the service has entered foreground state,
+ * avoiding slow service startup and Android foreground-service timeouts.
  */
 class AdhanPlaybackService : Service() {
     private var player: ExoPlayer? = null
     private var resumeQuranAfterAdhan = false
-    private val io = Executors.newSingleThreadExecutor()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        player = ExoPlayer.Builder(this)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
-                    .setUsage(C.USAGE_ALARM)
-                    .build(),
-                true
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .build().also { exo ->
-                exo.volume = 0.72f
-                exo.addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(state: Int) {
-                        if (state == Player.STATE_ENDED) finishAdhan()
-                    }
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        finishAdhan()
-                    }
-                })
-            }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -70,31 +49,75 @@ class AdhanPlaybackService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_PLAY, ACTION_TEST -> {
-                val name = intent.getStringExtra(AdhanScheduler.EXTRA_PRAYER) ?: PrayerType.DHUHR.name
-                val prayer = runCatching { PrayerType.valueOf(name) }.getOrDefault(PrayerType.DHUHR)
+                val prayerName = intent.getStringExtra(AdhanScheduler.EXTRA_PRAYER) ?: PrayerType.DHUHR.name
+                val prayer = runCatching { PrayerType.valueOf(prayerName) }.getOrDefault(PrayerType.DHUHR)
+
+                // Must happen immediately, before player creation or any network work.
                 startForeground(NOTIFICATION_ID, buildNotification(prayer))
+
                 if (AudioPlayerManager.playbackState.value == PlaybackState.PLAYING) {
                     resumeQuranAfterAdhan = true
                     AudioPlayerManager.pause()
                 }
-                play(prayer)
+
+                try {
+                    play(prayer)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Unable to start Adhan playback for $prayer", error)
+                    finishAdhan()
+                }
             }
+            else -> stopSelf(startId)
         }
         return START_NOT_STICKY
     }
 
+    private fun getOrCreatePlayer(): ExoPlayer {
+        player?.let { return it }
+        return ExoPlayer.Builder(applicationContext)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                    .setUsage(C.USAGE_ALARM)
+                    .build(),
+                true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+            .also { exo ->
+                exo.volume = 1.0f
+                exo.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        if (state == Player.STATE_ENDED) finishAdhan()
+                    }
+
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        Log.e(TAG, "Adhan audio playback failed", error)
+                        finishAdhan()
+                    }
+                })
+                player = exo
+            }
+    }
+
     private fun play(prayer: PrayerType) {
-        val url = AUDIO_URLS[prayer] ?: AUDIO_URLS[PrayerType.DHUHR]!!
+        val url = AUDIO_URLS[prayer] ?: AUDIO_URLS.getValue(PrayerType.DHUHR)
         val file = File(filesDir, "adhan/${prayer.name.lowercase()}.mp3")
         file.parentFile?.mkdirs()
-        val source = if (file.exists() && file.length() > 20_000L) Uri.fromFile(file) else Uri.parse(url)
-        player?.apply {
+        val source = if (file.exists() && file.length() > MIN_AUDIO_BYTES) {
+            Uri.fromFile(file)
+        } else {
+            Uri.parse(url)
+        }
+
+        getOrCreatePlayer().apply {
             stop()
             setMediaItem(MediaItem.fromUri(source))
             prepare()
             playWhenReady = true
         }
-        if (!file.exists()) prefetchPrayer(this, prayer)
+
+        if (!file.exists() || file.length() <= MIN_AUDIO_BYTES) prefetchPrayer(applicationContext, prayer)
     }
 
     private fun finishAdhan() {
@@ -102,19 +125,26 @@ class AdhanPlaybackService : Service() {
             resumeQuranAfterAdhan = false
             AudioPlayerManager.resume()
         }
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         stopSelf()
     }
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
-            val channel = NotificationChannel(CHANNEL_ID, "Adhan", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Prayer call audio"
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Adhan playback",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows when the Adhan is playing"
                 setSound(null, null)
-                if (manager.isNotificationPolicyAccessGranted) {
-                    setBypassDnd(true)
-                }
+                setShowBadge(false)
             }
             manager.createNotificationChannel(channel)
         }
@@ -122,19 +152,25 @@ class AdhanPlaybackService : Service() {
 
     private fun buildNotification(prayer: PrayerType): Notification {
         val openApp = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val stop = PendingIntent.getService(
-            this, 1, Intent(this, AdhanPlaybackService::class.java).setAction(ACTION_STOP),
+            this,
+            1,
+            Intent(this, AdhanPlaybackService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val prayerLabel = prayer.name.lowercase().replaceFirstChar { it.uppercase() }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Adhan")
-            .setContentText("The call to prayer is playing: ${prayer.name.lowercase().replaceFirstChar { it.uppercase() }}")
+            .setContentTitle("Adhan is playing")
+            .setContentText("$prayerLabel prayer")
             .setContentIntent(openApp)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stop)
             .build()
     }
@@ -146,7 +182,6 @@ class AdhanPlaybackService : Service() {
             resumeQuranAfterAdhan = false
             AudioPlayerManager.resume()
         }
-        io.shutdown()
         super.onDestroy()
     }
 
@@ -154,11 +189,13 @@ class AdhanPlaybackService : Service() {
         const val ACTION_PLAY = "com.example.noormuslim.ADHAN_PLAY"
         const val ACTION_TEST = "com.example.noormuslim.ADHAN_TEST"
         const val ACTION_STOP = "com.example.noormuslim.ADHAN_STOP"
-        private const val CHANNEL_ID = "noor_adhan_audio"
-        private const val NOTIFICATION_ID = 7101
 
-        // Internet Archive item is marked Public Domain Mark 1.0. Separate Fajr
-        // recording includes the Fajr-specific phrase. Files are cached on device.
+        private const val TAG = "NoorAdhan"
+        private const val CHANNEL_ID = "noor_adhan_playback_v2"
+        private const val NOTIFICATION_ID = 7101
+        private const val MIN_AUDIO_BYTES = 20_000L
+
+        // Public-domain recordings; Fajr has its own Fajr Adhan.
         private val AUDIO_URLS = mapOf(
             PrayerType.FAJR to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_01_Fajr_Adhan.mp3",
             PrayerType.DHUHR to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_02_Dhuhr_Adhan.mp3",
@@ -170,28 +207,39 @@ class AdhanPlaybackService : Service() {
         private val cacheExecutor = Executors.newSingleThreadExecutor()
 
         fun prefetchAll(context: android.content.Context) {
-            listOf(PrayerType.FAJR, PrayerType.DHUHR, PrayerType.ASR, PrayerType.MAGHRIB, PrayerType.ISHA)
-                .forEach { prayer -> prefetchPrayer(context.applicationContext, prayer) }
+            PrayerType.entries
+                .filter { it != PrayerType.SUNRISE }
+                .forEach { prefetchPrayer(context.applicationContext, it) }
         }
 
         private fun prefetchPrayer(context: android.content.Context, prayer: PrayerType) {
             val source = AUDIO_URLS[prayer] ?: return
             val target = File(context.filesDir, "adhan/${prayer.name.lowercase()}.mp3")
-            if (target.exists() && target.length() > 20_000L) return
+            if (target.exists() && target.length() > MIN_AUDIO_BYTES) return
             cacheExecutor.execute {
+                val temporary = File(target.parentFile, target.name + ".part")
                 runCatching {
                     target.parentFile?.mkdirs()
                     val connection = URL(source).openConnection() as HttpURLConnection
                     connection.connectTimeout = 15000
                     connection.readTimeout = 30000
                     connection.instanceFollowRedirects = true
-                    connection.connect()
-                    connection.inputStream.use { input ->
-                        val temporary = File(target.parentFile, target.name + ".part")
-                        temporary.outputStream().use { output -> input.copyTo(output) }
-                        if (temporary.length() > 20_000L) temporary.renameTo(target) else temporary.delete()
+                    try {
+                        connection.connect()
+                        connection.inputStream.use { input ->
+                            temporary.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        if (temporary.length() > MIN_AUDIO_BYTES) {
+                            temporary.renameTo(target)
+                        } else {
+                            temporary.delete()
+                        }
+                    } finally {
+                        connection.disconnect()
                     }
-                    connection.disconnect()
+                }.onFailure {
+                    Log.w(TAG, "Background Adhan audio cache failed for $prayer", it)
+                    temporary.delete()
                 }
             }
         }
@@ -205,7 +253,9 @@ class AdhanPlaybackService : Service() {
         }
 
         fun stop(context: android.content.Context) {
-            context.startService(Intent(context, AdhanPlaybackService::class.java).setAction(ACTION_STOP))
+            context.startService(
+                Intent(context, AdhanPlaybackService::class.java).setAction(ACTION_STOP)
+            )
         }
     }
 }

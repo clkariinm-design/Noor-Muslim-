@@ -502,22 +502,58 @@ fun PrayerTimesScreen(
         }
 
 
-        // Adhan settings: five individual schedules and a test/stop control.
+        // New Adhan control panel: master switch, per-prayer switches and safe test playback.
         item {
+            var allAdhanEnabled by remember {
+                mutableStateOf(appPreferences.isPrayerNotificationsEnabled())
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Adhan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Full call to prayer at each selected prayer time. Fajr uses its own recording.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Adhan & Prayer Alerts",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                "Automatic call to prayer for the five daily prayers",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = allAdhanEnabled,
+                            onCheckedChange = {
+                                allAdhanEnabled = it
+                                appPreferences.setPrayerNotificationsEnabled(it)
+                                AdhanScheduler.scheduleAll(context, currentCity)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+
                     listOf(
                         PrayerType.FAJR to strings.fajr,
                         PrayerType.DHUHR to strings.dhuhr,
@@ -525,52 +561,79 @@ fun PrayerTimesScreen(
                         PrayerType.MAGHRIB to strings.maghrib,
                         PrayerType.ISHA to strings.isha
                     ).forEach { (prayer, label) ->
-                        var enabled by remember(prayer) { mutableStateOf(appPreferences.isAdhanEnabled(prayer)) }
+                        var enabled by remember(prayer) {
+                            mutableStateOf(appPreferences.isAdhanEnabled(prayer))
+                        }
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(label, fontWeight = FontWeight.Medium)
                             Switch(
                                 checked = enabled,
-                                onCheckedChange = {
-                                    enabled = it
-                                    appPreferences.setAdhanEnabled(prayer, it)
+                                enabled = allAdhanEnabled,
+                                onCheckedChange = { checked ->
+                                    enabled = checked
+                                    appPreferences.setAdhanEnabled(prayer, checked)
                                     AdhanScheduler.scheduleAll(context, currentCity)
                                 }
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { AdhanPlaybackService.playTest(context, PrayerType.DHUHR) }) {
-                            Text("Test Adhan")
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                runCatching {
+                                    AdhanPlaybackService.playTest(context, PrayerType.DHUHR)
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        "Adhan test could not start. Please reopen the app.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2563EB)
+                            )
+                        ) {
+                            Text("▶  Test Adhan")
                         }
-                        OutlinedButton(onClick = { AdhanPlaybackService.stop(context) }) {
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = { AdhanPlaybackService.stop(context) }
+                        ) {
                             Text("Stop")
                         }
                     }
+
                     Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Keep notifications and Alarms & reminders enabled so Adhan can run while the app is closed.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
                         if (!alarmManager.canScheduleExactAlarms()) {
-                            TextButton(onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                            TextButton(
+                                onClick = {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                                        )
+                                    }
                                 }
-                            }) { Text("Allow precise prayer alarms") }
+                            ) { Text("Enable exact prayer alarms") }
                         }
-                    }
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
-                        !notificationManager.isNotificationPolicyAccessGranted
-                    ) {
-                        TextButton(onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-                            }
-                        }) { Text("Allow Adhan during Do Not Disturb") }
                     }
                 }
             }
