@@ -385,7 +385,12 @@ object QuranRepository {
             .asSequence()
             .takeWhile { it.number < surahNumber }
             .sumOf { it.ayahCount } + ayahNumber
-        return "https://cdn.islamic.network/quran/audio/128/${qari.audioSubfolder}/$globalAyahNumber.mp3"
+        val bitrate = when (qari.id) {
+            "abdulbaset" -> 64
+            "sudais" -> 192
+            else -> 128
+        }
+        return "https://cdn.islamic.network/quran/audio/$bitrate/${qari.audioSubfolder}/$globalAyahNumber.mp3"
     }
 
 }
