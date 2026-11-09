@@ -50,8 +50,8 @@ data class Qari(
 
 val AvailableQaris = listOf(
     Qari("alafasy", "Mishary Rashid Alafasy", "مشاري بن راشد العفاسي", "ar.alafasy", "128 kbps (High)", "Murattal"),
-    Qari("abdulbaset", "AbdulBaset AbdulSamad", "عبد الباسط عبد الصمد", "ar.abdulsamad", "128 kbps", "Murattal"),
-    Qari("sudais", "Abdurrahmaan As-Sudais", "عبدالرحمن السديس", "ar.abdurrahmaansudais", "128 kbps", "Murattal"),
+    Qari("abdulbaset", "AbdulBaset AbdulSamad", "عبد الباسط عبد الصمد", "ar.abdulsamad", "64 kbps", "Murattal"),
+    Qari("sudais", "Abdurrahmaan As-Sudais", "عبدالرحمن السديس", "ar.abdurrahmaansudais", "192 kbps", "Murattal"),
     Qari("husary", "Mahmoud Khalil Al-Husary", "محمود خليل الحصري", "ar.husary", "128 kbps", "Murattal"),
     Qari("shatri", "Abu Bakr Al-Shatri", "أبو بكر الشاطري", "ar.shaatree", "128 kbps", "Murattal"),
     Qari("hudhaify", "Ali Al-Hudhaify", "علي بن عبد الرحمن الحذيفي", "ar.hudhaify", "128 kbps", "Murattal"),
