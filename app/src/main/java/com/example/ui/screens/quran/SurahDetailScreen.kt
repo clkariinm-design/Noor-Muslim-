@@ -133,6 +133,7 @@ fun SurahDetailScreen(
 
     var ayahs by remember { mutableStateOf<List<Ayah>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showReciterDialog by remember { mutableStateOf(false) }
 
@@ -142,11 +143,16 @@ fun SurahDetailScreen(
     // Load Ayahs
     LaunchedEffect(surahNumber, selectedQari) {
         isLoading = true
-        ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
-        isLoading = false
-
-        // Record Last Read
-        appPreferences.setLastRead(surah.number, surah.nameEnglish, 1)
+        loadError = null
+        try {
+            ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
+            appPreferences.setLastRead(surah.number, surah.nameEnglish, 1)
+        } catch (error: Exception) {
+            ayahs = emptyList()
+            loadError = error.message
+        } finally {
+            isLoading = false
+        }
     }
 
     // Connect auto-play next Ayah
@@ -288,8 +294,15 @@ fun SurahDetailScreen(
                             onClick = {
                                 scope.launch {
                                     isLoading = true
-                                    ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
-                                    isLoading = false
+                                    loadError = null
+                                    try {
+                                        ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
+                                    } catch (error: Exception) {
+                                        ayahs = emptyList()
+                                        loadError = error.message
+                                    } finally {
+                                        isLoading = false
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = IslamicEmerald)
