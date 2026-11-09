@@ -191,19 +191,12 @@ object QuranRepository {
             }
         }
 
+        // Read from private storage only after the user explicitly downloads this surah.
         val cacheFile = surahCacheFile(context, surahNumber)
-        val cachedJson = cacheFile.takeIf { it.isFile && it.length() > 0L }
-            ?.readText(Charsets.UTF_8)
-
-        val json = cachedJson ?: try {
-            cacheSurahPayload(context, surahNumber)
+        val json = if (cacheFile.isFile && cacheFile.length() > 0L) {
             cacheFile.readText(Charsets.UTF_8)
-        } catch (error: Exception) {
-            if (cacheFile.isFile && cacheFile.length() > 0L) {
-                cacheFile.readText(Charsets.UTF_8)
-            } else {
-                throw error
-            }
+        } else {
+            com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber).toString()
         }
 
         val ayahs = parseAyahsJson(json, surahNumber, selectedQari)
@@ -215,24 +208,15 @@ object QuranRepository {
     }
 
     /**
-     * Downloads and persists a validated surah payload for offline reading.
-     * The cache is private to the app and is never exposed as a public file.
+     * Persists a complete, validated surah only after the user chooses Download.
      */
     suspend fun cacheSurahPayload(context: Context, surahNumber: Int) = withContext(Dispatchers.IO) {
         require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
         val surah = allSurahs.first { it.number == surahNumber }
         val target = surahCacheFile(context, surahNumber)
-        if (target.isFile && target.length() > 0L && hasCompleteTranslations(context, surahNumber)) {
-            return@withContext
-        }
+        if (target.isFile && target.length() > 0L) return@withContext
 
-        // Prefer the online payload (including available translations), but never block
-        // Quran reading when the user is offline: the verified Arabic text ships in assets.
-        val payload = try {
-            com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
-        } catch (_: Exception) {
-            bundledSurahPayload(context, surahNumber)
-        }
+        val payload = com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
         val validated = parseAyahsJson(payload.toString(), surahNumber, AvailableQaris[0])
         check(validated.size == surah.ayahCount) {
             "Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${validated.size}"
