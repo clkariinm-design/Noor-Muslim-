@@ -8,7 +8,7 @@ Region: `eu-central-1` (Frankfurt)
 
 The project already applies Google's Secrets Gradle Plugin and reads `.env`, with `.env.example` as its build fallback. Supabase URL and the **publishable** key are configured there. Never place a service-role or secret key in GitHub or an APK.
 
-The Android read-only API wrapper is `SupabaseQuranApi`. It uses the existing OkHttp dependency and calls the Supabase REST Data API. It exposes read operations for surah metadata, reciters, translation editions, ayah translations, and audio metadata.
+The Android API wrapper is `SupabaseQuranApi`. Quran reading now calls the public `quran-surah` Supabase Edge Function; the function fetches Uthmani Arabic plus English, Somali, Turkish, and French editions from AlQuran Cloud. The app does not bundle Quran text or keep a disk copy. A surah is cached only in memory while the process is running. No internet means no Quran text can be opened. The same wrapper also exposes read operations for catalogue metadata, reciters, translation editions, ayah translations, and audio metadata.
 
 ## Database
 
@@ -20,7 +20,7 @@ All five tables have RLS enabled. Anonymous and authenticated clients can only r
 
 Translation editions currently contain metadata placeholders only; the ayah translation table is empty. Do not present these as populated translations until a source and redistribution licence are verified and the actual text is imported.
 
-No audio files have been uploaded to this project yet. The app's existing EveryAyah playback URLs remain the current playback path. Populate `quran_audio_assets` only after verifying that the recording source permits redistribution/hosting.
+No audio files have been uploaded to this project yet. The app's existing EveryAyah playback URLs remain the current playback path. Populate `quran_audio_assets` only after verifying that the recording source permits redistribution/hosting. The bundled Quran text asset has been removed from the Android project; online reading is mandatory.
 
 ## Next integration stages
 
