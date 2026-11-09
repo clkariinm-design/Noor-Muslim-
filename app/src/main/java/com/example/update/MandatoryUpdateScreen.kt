@@ -1,7 +1,6 @@
 package com.example.update
 
 import android.content.Context
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,16 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
 import android.os.Build
 import kotlinx.coroutines.launch
 
 @Composable
 fun MandatoryUpdateScreen(
     context: Context,
-    update: AppUpdateInfo,
-    onInstalled: (Uri) -> Unit
+    update: AppUpdateInfo
 ) {
     val scope = rememberCoroutineScope()
     var progress by remember { mutableIntStateOf(0) }
