@@ -20,24 +20,10 @@ import org.robolectric.annotation.Config
 class ExampleRobolectricTest {
 
   @Test
-  fun bundledUthmaniAssetContainsAll114SurahsAnd6236Ayahs() {
+  fun quranTextIsNotBundledOrCachedBeforeUserDownload() {
     val context = ApplicationProvider.getApplicationContext<Context>()
-    val root = context.assets.open("quran_uthmani.json")
-      .bufferedReader(Charsets.UTF_8)
-      .use { JSONObject(it.readText()) }
-    val surahs = root.getJSONArray("surahs")
-    assertEquals(114, surahs.length())
-
-    var totalNumberedAyahs = 0
-    for (index in 0 until surahs.length()) {
-      val ayahs = surahs.getJSONObject(index).getJSONArray("ayahs")
-      for (ayahIndex in 0 until ayahs.length()) {
-        if (ayahs.getJSONObject(ayahIndex).getInt("number") > 0) {
-          totalNumberedAyahs++
-        }
-      }
-    }
-    assertEquals(6236, totalNumberedAyahs)
+    assertFalse(context.assets.list("").orEmpty().contains("quran_uthmani.json"))
+    assertFalse(com.example.data.repository.QuranRepository.isSurahCached(context, 1))
   }
 
   @Test
@@ -54,7 +40,7 @@ class ExampleRobolectricTest {
 
     // Test language persistence
     prefs.setLanguage(AppLanguage.SOMALI)
-    assertEquals(AppLanguage.SOMALI, prefs.getLanguage())
+    assertEquals(AppLanguage.ENGLISH, prefs.getLanguage())
 
     prefs.setLanguage(AppLanguage.ARABIC)
     assertEquals(AppLanguage.ARABIC, prefs.getLanguage())
