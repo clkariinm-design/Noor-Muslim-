@@ -41,7 +41,6 @@ object SupabaseQuranApi {
         val request = Request.Builder()
             .url("$baseUrl/rest/v1/$path")
             .header("apikey", publishableKey)
-            .header("Authorization", "Bearer $publishableKey")
             .header("Accept", "application/json")
             .get()
             .build()
