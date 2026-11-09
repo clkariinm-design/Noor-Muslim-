@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
+import org.json.JSONArray\nimport org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -19,6 +19,22 @@ object SupabaseQuranApi {
     private val baseUrl get() = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val publishableKey get() = BuildConfig.SUPABASE_PUBLISHABLE_KEY
     val isConfigured get() = baseUrl.startsWith("https://") && publishableKey.startsWith("sb_publishable_")
+
+    suspend fun getSurahPayload(surahNumber: Int): JSONObject = withContext(Dispatchers.IO) {
+        require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+        check(isConfigured) { "Supabase is not configured." }
+        val request = Request.Builder()
+            .url("$baseUrl/functions/v1/quran-surah?surah=$surahNumber")
+            .header("apikey", publishableKey)
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        client.newCall(request).execute().use { result ->
+            val body = result.body?.string().orEmpty()
+            if (!result.isSuccessful) throw IOException("Quran text service unavailable (" + result.code + "): " + body)
+            JSONObject(body)
+        }
+    }
 
     suspend fun getSurahs() = get("quran_surahs?select=*&order=surah_number.asc")
     suspend fun getReciters() = get("quran_reciters?select=id,slug,name,country,style,sort_order&is_active=eq.true&order=sort_order.asc")
