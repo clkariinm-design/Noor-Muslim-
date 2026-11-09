@@ -159,7 +159,7 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(230.dp)
+                    .height(246.dp)
                     .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
             ) {
                 Image(
