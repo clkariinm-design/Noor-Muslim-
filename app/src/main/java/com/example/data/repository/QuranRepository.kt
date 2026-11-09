@@ -9,6 +9,7 @@ import com.example.data.model.Surah
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 
 object QuranRepository {
 
@@ -188,14 +189,62 @@ object QuranRepository {
             }
         }
 
-        val payload = com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
-        val ayahs = parseAyahsJson(payload.toString(), surahNumber, selectedQari)
+        val cacheFile = surahCacheFile(context, surahNumber)
+        val cachedJson = cacheFile.takeIf { it.isFile && it.length() > 0L }
+            ?.readText(Charsets.UTF_8)
+
+        val json = cachedJson ?: try {
+            cacheSurahPayload(context, surahNumber)
+            cacheFile.readText(Charsets.UTF_8)
+        } catch (error: Exception) {
+            if (cacheFile.isFile && cacheFile.length() > 0L) {
+                cacheFile.readText(Charsets.UTF_8)
+            } else {
+                throw error
+            }
+        }
+
+        val ayahs = parseAyahsJson(json, surahNumber, selectedQari)
         check(ayahs.size == surah.ayahCount) {
-            "Online Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${ayahs.size}"
+            "Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${ayahs.size}"
         }
         memoryCache[surahNumber] = ayahs
         ayahs
     }
+
+    /**
+     * Downloads and persists a validated surah payload for offline reading.
+     * The cache is private to the app and is never exposed as a public file.
+     */
+    suspend fun cacheSurahPayload(context: Context, surahNumber: Int) = withContext(Dispatchers.IO) {
+        require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+        val surah = allSurahs.first { it.number == surahNumber }
+        val target = surahCacheFile(context, surahNumber)
+        if (target.isFile && target.length() > 0L) return@withContext
+
+        val payload = com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+        val validated = parseAyahsJson(payload.toString(), surahNumber, AvailableQaris[0])
+        check(validated.size == surah.ayahCount) {
+            "Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${validated.size}"
+        }
+
+        target.parentFile?.mkdirs()
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        temporary.writeText(payload.toString(), Charsets.UTF_8)
+        if (!temporary.renameTo(target)) {
+            target.writeText(payload.toString(), Charsets.UTF_8)
+            temporary.delete()
+        }
+    }
+
+    fun isSurahCached(context: Context, surahNumber: Int): Boolean {
+        if (surahNumber !in 1..114) return false
+        val file = surahCacheFile(context, surahNumber)
+        return file.isFile && file.length() > 0L
+    }
+
+    private fun surahCacheFile(context: Context, surahNumber: Int): File =
+        File(File(context.filesDir, "quran_cache"), "surah_${surahNumber}.json")
 
     private fun parseAyahsJson(jsonString: String, surahNumber: Int, selectedQari: Qari): List<Ayah> {
         val root = JSONObject(jsonString)
