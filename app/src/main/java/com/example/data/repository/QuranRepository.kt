@@ -215,6 +215,73 @@ object QuranRepository {
     }
 
     /**
+     * Fetches Arabic ayahs from the Noor Muslim Railway API and validates the
+     * complete, ordered surah before it can be cached.
+     */
+    private suspend fun railwaySurahPayload(
+        surahNumber: Int,
+        expectedAyahCount: Int
+    ): JSONObject {
+        val rows = com.example.data.remote.NoorBackendApi.getSurahAyahs(surahNumber)
+        check(rows.length() == expectedAyahCount) {
+            "Railway Quran response incomplete for surah $surahNumber: expected $expectedAyahCount, received ${rows.length()}"
+        }
+
+        val ayahs = JSONArray()
+        for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index)
+            check(row.getInt("surah_number") == surahNumber) {
+                "Railway Quran response contains an ayah from another surah."
+            }
+            val expectedNumber = index + 1
+            check(row.getInt("ayah_number") == expectedNumber) {
+                "Railway Quran ayah order is invalid for surah $surahNumber."
+            }
+            val text = row.getString("text_uthmani")
+            check(text.isNotBlank()) {
+                "Railway Quran response contains empty Arabic text."
+            }
+            ayahs.put(
+                JSONObject()
+                    .put("numberInSurah", expectedNumber)
+                    .put("text", text)
+            )
+        }
+
+        val edition = JSONObject()
+            .put("edition", JSONObject().put("identifier", "quran-uthmani"))
+            .put("ayahs", ayahs)
+        return JSONObject().put("data", JSONArray().put(edition))
+    }
+
+    /**
+     * Uses Railway's Arabic as the canonical text while retaining translations
+     * from Supabase. The parser consumes the same edition-based JSON shape.
+     */
+    private fun mergeRailwayArabicWithTranslations(
+        railwayPayload: JSONObject,
+        translationsPayload: JSONObject?
+    ): JSONObject {
+        val merged = JSONArray()
+        val source = translationsPayload?.optJSONArray("data")
+        if (source != null) {
+            for (index in 0 until source.length()) {
+                val edition = source.getJSONObject(index)
+                val identifier = edition.optJSONObject("edition")
+                    ?.optString("identifier")
+                    .orEmpty()
+                if (!identifier.contains("quran-uthmani")) {
+                    merged.put(edition)
+                }
+            }
+        }
+
+        val railwayData = railwayPayload.getJSONArray("data")
+        merged.put(0, railwayData.getJSONObject(0))
+        return JSONObject().put("data", merged)
+    }
+
+    /**
      * Downloads and persists a validated surah payload for offline reading.
      * The cache is private to the app and is never exposed as a public file.
      */
@@ -226,12 +293,23 @@ object QuranRepository {
             return@withContext
         }
 
-        // Prefer the online payload (including available translations), but never block
-        // Quran reading when the user is offline: the verified Arabic text ships in assets.
+        // Railway is the primary source for verified Uthmani Arabic text.
+        // Keep translations from the existing Supabase payload when available.
+        // If either service is unavailable, retain the existing offline fallbacks.
         val payload = try {
-            com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+            val railwayPayload = railwaySurahPayload(surahNumber, surah.ayahCount)
+            val translationsPayload = try {
+                com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+            } catch (_: Exception) {
+                null
+            }
+            mergeRailwayArabicWithTranslations(railwayPayload, translationsPayload)
         } catch (_: Exception) {
-            bundledSurahPayload(context, surahNumber)
+            try {
+                com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+            } catch (_: Exception) {
+                bundledSurahPayload(context, surahNumber)
+            }
         }
         val validated = parseAyahsJson(payload.toString(), surahNumber, AvailableQaris[0])
         check(validated.size == surah.ayahCount) {
