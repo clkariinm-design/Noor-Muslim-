@@ -147,7 +147,9 @@ fun NoorMuslimApp() {
                                 language = currentLanguage,
                                 lastRead = lastRead,
                                 bookmarks = bookmarks,
-                                onSelectSurah = { surahNum -> viewingSurahNumber = surahNum }
+                                onSelectSurah = { surahNum -> viewingSurahNumber = surahNum },
+                                selectedQariId = appPreferences.getSelectedQariId(),
+                                onReciterSelected = { appPreferences.setSelectedQariId(it.id) }
                             )
                             NoorNavDestination.TOOLS -> ToolsScreen(onNavigate = { destination -> currentDestination = destination })
                             NoorNavDestination.PRAYER -> PrayerTimesScreen(
