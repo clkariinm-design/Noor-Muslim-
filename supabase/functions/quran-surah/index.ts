@@ -41,6 +41,7 @@ const QURANENC_TRANSLATIONS = [
 
 async function fetchQuranEncEdition(
   surah: number,
+  expectedAyahCount: number,
   translation: typeof QURANENC_TRANSLATIONS[number],
 ): Promise<QuranEdition> {
   const response = await fetch(
@@ -51,8 +52,8 @@ async function fetchQuranEncEdition(
   const body = await response.json() as {
     result?: Array<{ aya: number; translation: string; footnotes?: string }>;
   };
-  if (!Array.isArray(body.result) || body.result.length === 0) {
-    throw new Error(`QuranEnc ${translation.key} returned no ayahs`);
+  if (!Array.isArray(body.result) || body.result.length !== expectedAyahCount) {
+    throw new Error(`QuranEnc ${translation.key} returned an incomplete surah`);
   }
 
   return {
@@ -125,6 +126,7 @@ Deno.serve(async (req: Request) => {
   const projectUrl = Deno.env.get("SUPABASE_URL");
   const apiKey = Deno.env.get("SUPABASE_ANON_KEY") ?? req.headers.get("apikey");
   let databaseArabic: ArabicRow[] | null = null;
+  let expectedAyahCount: number | null = null;
   const databaseTranslations: QuranEdition[] = [];
   let databaseHasCompleteTranslations = false;
 
@@ -146,6 +148,7 @@ Deno.serve(async (req: Request) => {
       ]);
 
       const expectedAyahs = surahRows[0]?.ayah_count;
+      expectedAyahCount = expectedAyahs ?? null;
       if (expectedAyahs && ayahRows.length === expectedAyahs) {
         databaseArabic = ayahRows;
 
@@ -204,9 +207,13 @@ Deno.serve(async (req: Request) => {
     // A complete database copy is authoritative; no upstream request is needed.
     payload = { code: 200, status: "OK", data: [] };
   } else {
-    const translationResults = await Promise.allSettled(
-      QURANENC_TRANSLATIONS.map((translation) => fetchQuranEncEdition(surah, translation)),
-    );
+    const translationResults = expectedAyahCount
+      ? await Promise.allSettled(
+          QURANENC_TRANSLATIONS.map((translation) =>
+            fetchQuranEncEdition(surah, expectedAyahCount as number, translation)
+          ),
+        )
+      : [];
     const onlineTranslations = translationResults
       .filter((result): result is PromiseFulfilledResult<QuranEdition> => result.status === "fulfilled")
       .map((result) => result.value);
