@@ -403,6 +403,32 @@ fun SettingsScreen(
                         color = IslamicEmerald,
                         modifier = Modifier.clickable { uriHandler.openUri("https://tanzil.net/updates/") }
                     )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Translations (QuranEnc.com)\\nEnglish: Saheeh International / Noor International Center — Version 1.1.2\\nSomali: Abdullah Hasan Yaqoub — Version 1.0.27\\nTurkish: Rowwad Translation Center — Version 1.0.4\\nFrench: Rachid Maach — Version 1.0.3\\nTranslations are reproduced without modification. Publisher, source and version are retained.",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Translation source and terms: https://quranenc.com",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://quranenc.com/en/home/api") }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Audio recitations: Islamic Network / AlQuran Cloud CDN. Recitations remain copyrighted by their reciters or estates and may be withdrawn by rights holders.",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Audio source and terms: https://alquran.cloud/terms-and-conditions",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://alquran.cloud/terms-and-conditions") }
+                    )
                 }
             },
             confirmButton = {
