@@ -221,7 +221,7 @@ fun QuranScreen(
                                             color = Color.White
                                         )
                                         Text(
-                                            text = "Available offline",
+                                            text = "Internet connection required to read",
                                             fontSize = 11.sp,
                                             color = Color.White.copy(alpha = 0.78f)
                                         )
