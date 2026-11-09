@@ -467,6 +467,7 @@ fun PrayerTimesScreen(
                         onClick = {
                             notificationsEnabled = !notificationsEnabled
                             appPreferences.setPrayerNotificationsEnabled(notificationsEnabled)
+                            AdhanScheduler.scheduleAll(context, currentCity)
                         }
                     ) {
                         Icon(

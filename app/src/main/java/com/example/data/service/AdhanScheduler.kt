@@ -35,7 +35,8 @@ object AdhanScheduler {
         prayers.forEach { prayer ->
             val requestCode = requestCode(prayer)
             val pending = pendingIntent(app, prayer, requestCode)
-            if (!prefs.isAdhanEnabled(prayer)) {
+            // Respect the master prayer-notifications switch as well as each prayer's Adhan switch.
+            if (!prefs.isPrayerNotificationsEnabled() || !prefs.isAdhanEnabled(prayer)) {
                 alarmManager.cancel(pending)
                 return@forEach
             }
