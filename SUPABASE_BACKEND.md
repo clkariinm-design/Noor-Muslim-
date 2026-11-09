@@ -12,13 +12,13 @@ The Android API wrapper is `SupabaseQuranApi`. Quran reading calls the public `q
 
 ## Database
 
-The live database has five tables: `quran_surahs` (114 surahs), `quran_reciters` (10 catalogue entries), `quran_translations` (English/Somali/Turkish/French edition placeholders), `quran_ayah_translations` (licensed text keyed by edition/surah/ayah), and `quran_audio_assets` (per-ayah or per-surah audio metadata).
+The live database has six tables: `quran_surahs` (114 surahs), `quran_ayahs` (primary Uthmani ayah text, with source and licence metadata), `quran_reciters` (10 catalogue entries), `quran_translations` (English/Somali/Turkish/French edition placeholders), `quran_ayah_translations` (licensed text keyed by edition/surah/ayah), and `quran_audio_assets` (per-ayah or per-surah audio metadata). The `quran-surah` Edge Function prefers a complete surah from `quran_ayahs`, uses complete translation rows when present, and falls back to AlQuran Cloud for missing content.
 
 All five tables have RLS enabled. Anonymous and authenticated clients can only read active catalogue rows. No public write policy exists. The Supabase Security Advisor returned no findings after initial schema setup.
 
 ## Content status
 
-Translation editions currently contain metadata placeholders only; the ayah translation table is empty. Do not present these as populated translations until a source and redistribution licence are verified and the actual text is imported.
+Translation editions currently contain metadata placeholders only; the ayah translation table is empty. The new `quran_ayahs` table is also empty, so the Edge Function currently uses the upstream backup until a verified Uthmani dataset is imported. Do not present the database as fully seeded or translations as populated until each source and its reuse licence are verified.
 
 No audio files have been uploaded to this project yet. The app's existing EveryAyah playback URLs remain the current playback path. Audio caching has been changed to download only the surah the user starts listening to; it no longer bulk-downloads all 114 surahs at first launch. Populate `quran_audio_assets` only after verifying that the recording source permits redistribution/hosting. The bundled Quran text asset has been removed from the Android project.
 
