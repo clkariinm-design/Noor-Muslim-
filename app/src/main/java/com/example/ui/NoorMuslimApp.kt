@@ -5,7 +5,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
@@ -18,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import com.example.data.local.AppPreferences
+import com.example.data.remote.RemoteAppConfig
+import com.example.data.remote.RemoteAppConfigClient
 import com.example.data.model.AppLanguage
 import com.example.data.model.Translations
 import com.example.data.repository.AudioPlayerManager
@@ -65,6 +70,8 @@ fun NoorMuslimApp() {
 
     var currentDestination by remember { mutableStateOf(NoorNavDestination.HOME) }
     var viewingSurahNumber by remember { mutableStateOf<Int?>(null) }
+    var remoteConfig by remember { mutableStateOf<RemoteAppConfig?>(null) }
+    var remoteNoticeDismissed by remember { mutableStateOf(false) }
 
     // System Back Handler
     BackHandler(enabled = viewingSurahNumber != null || currentDestination != NoorNavDestination.HOME) {
@@ -78,6 +85,36 @@ fun NoorMuslimApp() {
     NoorMuslimTheme(darkTheme = isDark) {
         // Enforce RTL for Arabic and LTR for Somali, English, Turkish, French
         CompositionLocalProvider(LocalLayoutDirection provides currentLanguage.layoutDirection) {
+            // Fetch server controls once per app launch. If the network is unavailable,
+            // keep the offline-first app fully usable with no blocking startup screen.
+            LaunchedEffect(Unit) {
+                remoteConfig = runCatching { RemoteAppConfigClient.fetch() }.getOrNull()
+            }
+
+            val config = remoteConfig
+            val noticeTitle = when {
+                config?.maintenanceEnabled == true -> "Noor Muslim"
+                config?.announcementEnabled == true -> config.announcementTitle.ifBlank { "Announcement" }
+                else -> null
+            }
+            val noticeMessage = when {
+                config?.maintenanceEnabled == true -> config?.maintenanceMessage
+                config?.announcementEnabled == true -> config?.announcementMessage
+                else -> null
+            }
+            if (!remoteNoticeDismissed && noticeTitle != null && !noticeMessage.isNullOrBlank()) {
+                AlertDialog(
+                    onDismissRequest = { remoteNoticeDismissed = true },
+                    title = { Text(noticeTitle) },
+                    text = { Text(noticeMessage) },
+                    confirmButton = {
+                        TextButton(onClick = { remoteNoticeDismissed = true }) {
+                            Text("OK")
+                        }
+                    }
+                )
+            }
+
             Scaffold(
                 topBar = {
                     if (viewingSurahNumber == null) {
