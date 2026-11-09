@@ -16,7 +16,7 @@ enum class AppLanguage(
 
     companion object {
         fun fromCode(code: String): AppLanguage {
-            return entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: ENGLISH
+            return if (code.equals("ar", ignoreCase = true)) ARABIC else ENGLISH
         }
     }
 }
