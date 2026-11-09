@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AudioPlayerManager.initialize(applicationContext)
         QuranAudioDownloadManager.initialize(applicationContext)
-        QuranTextPrefetchWorker.enqueue(applicationContext)
+        QuranTextPrefetchWorker.cancelPending(applicationContext)
         enableEdgeToEdge()
         setContent {
             NoorMuslimApp()
