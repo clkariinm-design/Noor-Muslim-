@@ -8,6 +8,7 @@ const QURANENC_TRANSLATIONS = [
     name: "English Translation",
     translator: "Saheeh International",
     publisher: "Noor International Center",
+    transcript: "Saheeh International; issued by Noor International Center.",
     version: "1.1.2",
   },
   {
@@ -17,6 +18,7 @@ const QURANENC_TRANSLATIONS = [
     name: "Somali Translation",
     translator: "Abdullah Hasan Yaqoub",
     publisher: "QuranEnc.com",
+    transcript: "Translation by Abdullah Hasan Yaqoub.",
     version: "1.0.27",
   },
   {
@@ -26,6 +28,7 @@ const QURANENC_TRANSLATIONS = [
     name: "Turkish Translation",
     translator: "Rowwad Translation Center",
     publisher: "Rowwad Translation Center / QuranEnc.com",
+    transcript: "Translation by Rowwad Translation Center.",
     version: "1.0.4",
   },
   {
@@ -35,6 +38,7 @@ const QURANENC_TRANSLATIONS = [
     name: "French Translation",
     translator: "Rachid Maach",
     publisher: "QuranEnc.com",
+    transcript: "Translation by Rachid Maach.",
     version: "1.0.3",
   },
 ] as const;
@@ -63,6 +67,7 @@ async function fetchQuranEncEdition(
       name: translation.name,
       englishName: translation.translator,
       publisher: translation.publisher,
+      transcript: translation.transcript,
       version: translation.version,
       sourceName: "QuranEnc.com",
       sourceUrl: "https://quranenc.com",
