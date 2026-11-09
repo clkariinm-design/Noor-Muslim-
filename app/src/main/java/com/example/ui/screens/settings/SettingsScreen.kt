@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -74,6 +75,7 @@ fun SettingsScreen(
     var showQariDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
 
     var themeMode by remember { mutableStateOf(appPreferences.getThemeMode()) }
     var arabicFontSize by remember { mutableFloatStateOf(appPreferences.getArabicFontSize()) }
@@ -382,6 +384,25 @@ fun SettingsScreen(
                     Text(text = strings.aboutText, fontSize = 14.sp, lineHeight = 20.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(text = strings.developerNote, fontSize = 12.sp, color = IslamicGold, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Quran text (Uthmani, Version 1.1)\\nCopyright © 2007–2021 Tanzil Project\\nLicense: Creative Commons Attribution 3.0\\nThis carefully verified Quran text is reproduced verbatim and must not be changed.",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Source: https://tanzil.net",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://tanzil.net") }
+                    )
+                    Text(
+                        text = "Updates: https://tanzil.net/updates/",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://tanzil.net/updates/") }
+                    )
                 }
             },
             confirmButton = {
