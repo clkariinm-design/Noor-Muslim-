@@ -10,15 +10,22 @@ const JSON_HEADERS = {
 
 type AyahRow = { ayah_number: number; text: string };
 type ArabicRow = { ayah_number: number; text_uthmani: string };
+type QuranEdition = {
+  edition?: { identifier?: string; [key: string]: unknown };
+  ayahs?: Array<{ numberInSurah: number; text: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+};
 
 async function databaseRows<T>(projectUrl: string, apiKey: string, path: string): Promise<T[]> {
-  const response = await fetch(`${projectUrl}/rest/v1/${path}`, {
-    headers: {
-      "apikey": apiKey,
-      "Authorization": `Bearer ${apiKey}`,
-      "Accept": "application/json",
-    },
-  });
+  const headers: Record<string, string> = {
+    "apikey": apiKey,
+    "Accept": "application/json",
+  };
+  // A legacy anon key is a JWT. A publishable key is not a JWT and must not be
+  // sent as a bearer token; the API gateway identifies it from the apikey header.
+  if (apiKey.startsWith("eyJ")) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  const response = await fetch(`${projectUrl}/rest/v1/${path}`, { headers });
   if (!response.ok) throw new Error(`Supabase content query failed: ${response.status}`);
   return await response.json() as T[];
 }
@@ -41,12 +48,13 @@ Deno.serve(async (req: Request) => {
   }
 
   const projectUrl = Deno.env.get("SUPABASE_URL");
-  const apiKey = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY");
+  const apiKey = Deno.env.get("SUPABASE_ANON_KEY") ?? req.headers.get("apikey");
   let databaseArabic: ArabicRow[] | null = null;
-  const databaseTranslations: Array<Record<string, unknown>> = [];
+  const databaseTranslations: QuranEdition[] = [];
+  let databaseHasCompleteTranslations = false;
 
-  // Supabase is the primary content source. Only use a complete surah so partial
-  // imports can never replace a correct upstream edition.
+  // Supabase is primary. A surah is accepted only when every ayah is present,
+  // preventing a partial import from replacing a complete upstream edition.
   if (projectUrl && apiKey) {
     try {
       const [surahRows, ayahRows] = await Promise.all([
@@ -78,7 +86,7 @@ Deno.serve(async (req: Request) => {
           "quran_translations?select=id,edition_slug,language_code,language_name,translator_name&is_active=eq.true",
         );
 
-        const translationResults = await Promise.all(editions.map(async (edition) => {
+        const translationResults = await Promise.all(editions.map(async (edition): Promise<QuranEdition | null> => {
           try {
             const rows = await databaseRows<AyahRow>(
               projectUrl,
@@ -104,36 +112,44 @@ Deno.serve(async (req: Request) => {
             return null;
           }
         }));
+
         for (const result of translationResults) {
           if (result) databaseTranslations.push(result);
         }
+        databaseHasCompleteTranslations =
+          editions.length > 0 && databaseTranslations.length === editions.length;
       }
     } catch (error) {
       console.warn("Quran database unavailable; using upstream backup.", error);
     }
   }
 
-  let payload: { code?: number; status?: string; data?: Array<Record<string, unknown>> };
-  try {
-    const upstream = await fetch(
-      `https://api.alquran.cloud/v1/surah/${surah}/editions/${ALLOWED_EDITIONS}`,
-      { headers: { "Accept": "application/json" } },
-    );
-    if (!upstream.ok) throw new Error(`Upstream Quran API returned ${upstream.status}`);
-    payload = await upstream.json();
-    if (!Array.isArray(payload?.data)) throw new Error("Invalid upstream Quran response");
-  } catch (error) {
-    if (!databaseArabic) {
-      console.error("No complete Quran source available.", error);
-      return jsonResponse({ error: "Quran text service is temporarily unavailable" }, 502, {
-        "Cache-Control": "no-store",
-      });
-    }
+  let payload: { code?: number; status?: string; data?: QuranEdition[] };
+  if (databaseArabic && databaseHasCompleteTranslations) {
+    // A complete database copy is authoritative; no upstream request is needed.
     payload = { code: 200, status: "OK", data: [] };
+  } else {
+    try {
+      const upstream = await fetch(
+        `https://api.alquran.cloud/v1/surah/${surah}/editions/${ALLOWED_EDITIONS}`,
+        { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(12000) },
+      );
+      if (!upstream.ok) throw new Error(`Upstream Quran API returned ${upstream.status}`);
+      payload = await upstream.json() as { code?: number; status?: string; data?: QuranEdition[] };
+      if (!Array.isArray(payload?.data)) throw new Error("Invalid upstream Quran response");
+    } catch (error) {
+      if (!databaseArabic) {
+        console.error("No complete Quran source available.", error);
+        return jsonResponse({ error: "Quran text service is temporarily unavailable" }, 502, {
+          "Cache-Control": "no-store",
+        });
+      }
+      payload = { code: 200, status: "OK", data: [] };
+    }
   }
 
   const editions = payload.data ?? [];
-  const arabicFromDatabase = databaseArabic
+  const arabicFromDatabase: QuranEdition | null = databaseArabic
     ? {
         edition: {
           identifier: "quran-uthmani",
@@ -149,24 +165,25 @@ Deno.serve(async (req: Request) => {
       }
     : null;
 
-  const merged = editions.filter((edition) =>
-    edition?.edition?.identifier !== "quran-uthmani"
+  const merged: QuranEdition[] = editions.filter((edition) =>
+    edition.edition?.identifier !== "quran-uthmani"
   );
   if (arabicFromDatabase) merged.unshift(arabicFromDatabase);
 
-  // Complete database translations replace their upstream equivalents. Missing
-  // or partial translations continue to use the upstream edition as a backup.
+  // Complete database translations replace upstream editions. Missing or partial
+  // translations continue to use the upstream edition as a backup.
   for (const translation of databaseTranslations) {
-    const identifier = (translation.edition as { identifier: string }).identifier;
+    const identifier = translation.edition?.identifier;
+    if (typeof identifier !== "string") continue;
     const existingIndex = merged.findIndex((edition) =>
-      edition?.edition?.identifier === identifier
+      edition.edition?.identifier === identifier
     );
     if (existingIndex >= 0) merged[existingIndex] = translation;
     else merged.push(translation);
   }
 
   const finalArabic = merged.find((edition) =>
-    edition?.edition?.identifier === "quran-uthmani"
+    edition.edition?.identifier === "quran-uthmani"
   );
   if (!finalArabic || !Array.isArray(finalArabic.ayahs)) {
     return jsonResponse({ error: "Quran text response failed validation" }, 502, {
