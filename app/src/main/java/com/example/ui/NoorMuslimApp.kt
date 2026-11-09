@@ -5,7 +5,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
@@ -66,6 +69,7 @@ fun NoorMuslimApp() {
 
     var currentDestination by remember { mutableStateOf(NoorNavDestination.HOME) }
     var viewingSurahNumber by remember { mutableStateOf<Int?>(null) }
+    var showWelcome by remember { mutableStateOf(!appPreferences.hasSeenWelcome()) }
 
     // System Back Handler
     BackHandler(enabled = viewingSurahNumber != null || currentDestination != NoorNavDestination.HOME) {
@@ -177,6 +181,28 @@ fun NoorMuslimApp() {
                         }
                     }
                 }
+            }
+            if (showWelcome) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showWelcome = false
+                        appPreferences.setHasSeenWelcome(true)
+                    },
+                    title = { Text("Welcome to Noor Muslim") },
+                    text = {
+                        Text(
+                            "Your daily Islamic companion. Explore prayer times, read and listen to the Holy Quran, find the Qibla, and use daily duas and Tasbeeh. Choose your language and set your location in Settings."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showWelcome = false
+                                appPreferences.setHasSeenWelcome(true)
+                            }
+                        ) { Text("Get started") }
+                    }
+                )
             }
         }
     }
