@@ -46,8 +46,8 @@ object QuranAudioDownloadManager {
                 rootDir.mkdirs()
             }
             refreshDownloadedStatuses(context)
-            // Prepare the default reciter's library quietly; Quran navigation never waits.
-            downloadAllSurahsInBackground(context, AvailableQaris.first())
+            // Audio is cached only when a user starts listening to a surah.
+            // This avoids downloading the entire reciter library on first launch.
         }
     }
 
