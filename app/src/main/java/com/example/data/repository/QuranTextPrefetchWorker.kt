@@ -25,7 +25,7 @@ class QuranTextPrefetchWorker(
 
         return try {
             for (surah in start..end) {
-                if (!QuranRepository.isSurahCached(applicationContext, surah)) {
+                if (!QuranRepository.hasCompleteTranslations(applicationContext, surah)) {
                     QuranRepository.cacheSurahPayload(applicationContext, surah)
                 }
             }
