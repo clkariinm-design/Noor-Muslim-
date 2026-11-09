@@ -378,9 +378,14 @@ object QuranRepository {
     }
 
     fun getAyahAudioUrl(qari: Qari, surahNumber: Int, ayahNumber: Int): String {
-        val sStr = String.format("%03d", surahNumber)
-        val aStr = String.format("%03d", ayahNumber)
-        return "https://everyayah.com/data/${qari.audioSubfolder}/$sStr$aStr.mp3"
+        val surah = allSurahs.firstOrNull { it.number == surahNumber }
+            ?: throw IllegalArgumentException("Invalid surah number")
+        require(ayahNumber in 1..surah.ayahCount) { "Invalid ayah number" }
+        val globalAyahNumber = allSurahs
+            .asSequence()
+            .takeWhile { it.number < surahNumber }
+            .sumOf { it.ayahCount } + ayahNumber
+        return "https://cdn.islamic.network/quran/audio/128/${qari.audioSubfolder}/$globalAyahNumber.mp3"
     }
 
 }
