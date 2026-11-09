@@ -154,7 +154,7 @@ fun SettingsScreen(
         item {
             SettingsCard(
                 icon = Icons.Default.LocationOn,
-                title = "Location",
+                title = strings.currentLocation,
                 subtitle = "${currentCity.name}, ${currentCity.country}",
                 testTag = "setting_location",
                 onClick = requestCurrentLocation
