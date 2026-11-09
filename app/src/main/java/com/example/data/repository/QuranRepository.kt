@@ -222,7 +222,9 @@ object QuranRepository {
         require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
         val surah = allSurahs.first { it.number == surahNumber }
         val target = surahCacheFile(context, surahNumber)
-        if (target.isFile && target.length() > 0L) return@withContext
+        if (target.isFile && target.length() > 0L && hasCompleteTranslations(context, surahNumber)) {
+            return@withContext
+        }
 
         // Prefer the online payload (including available translations), but never block
         // Quran reading when the user is offline: the verified Arabic text ships in assets.
@@ -242,6 +244,24 @@ object QuranRepository {
         if (!temporary.renameTo(target)) {
             target.writeText(payload.toString(), Charsets.UTF_8)
             temporary.delete()
+        }
+    }
+
+    fun hasCompleteTranslations(context: Context, surahNumber: Int): Boolean {
+        if (surahNumber !in 1..114) return false
+        val file = surahCacheFile(context, surahNumber)
+        if (!file.isFile || file.length() <= 0L) return false
+        return try {
+            val data = JSONObject(file.readText(Charsets.UTF_8)).getJSONArray("data")
+            val required = listOf("english_saheeh", "somali_yacob", "turkish_rwwad", "french_rashid")
+            val present = mutableSetOf<String>()
+            for (i in 0 until data.length()) {
+                val identifier = data.getJSONObject(i).getJSONObject("edition").optString("identifier")
+                if (identifier in required) present.add(identifier)
+            }
+            present.containsAll(required)
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -316,10 +336,10 @@ object QuranRepository {
             val identifier = ed.getJSONObject("edition").getString("identifier")
             when {
                 identifier.contains("quran-uthmani") -> arabicEd = ed
-                identifier.contains("en.sahih") -> enEd = ed
-                identifier.contains("so.abduh") -> soEd = ed
-                identifier.contains("tr.diyanet") -> trEd = ed
-                identifier.contains("fr.hamidullah") -> frEd = ed
+                identifier.contains("english_saheeh") || identifier.contains("en.sahih") -> enEd = ed
+                identifier.contains("somali_yacob") || identifier.contains("so.abduh") -> soEd = ed
+                identifier.contains("turkish_rwwad") || identifier.contains("tr.diyanet") -> trEd = ed
+                identifier.contains("french_rashid") || identifier.contains("fr.hamidullah") -> frEd = ed
             }
         }
 
