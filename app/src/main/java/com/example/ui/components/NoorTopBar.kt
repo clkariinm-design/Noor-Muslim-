@@ -127,7 +127,7 @@ fun NoorTopBar(
                     expanded = showLanguageMenu,
                     onDismissRequest = { showLanguageMenu = false }
                 ) {
-                    AppLanguage.entries.forEach { lang ->
+                    listOf(AppLanguage.ENGLISH, AppLanguage.ARABIC).forEach { lang ->
                         DropdownMenuItem(
                             text = {
                                 Text(
