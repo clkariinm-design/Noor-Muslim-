@@ -126,6 +126,10 @@ fun SurahDetailScreen(
     var loadError by remember { mutableStateOf<String?>(null) }
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showReciterDialog by remember { mutableStateOf(false) }
+    var isSurahSaved by remember(surahNumber) {
+        mutableStateOf(QuranRepository.isSurahCached(context, surahNumber))
+    }
+    var isSavingSurah by remember { mutableStateOf(false) }
 
     var arabicFontSize by remember { mutableStateOf(appPreferences.getArabicFontSize()) }
     var translationFontSize by remember { mutableStateOf(appPreferences.getTranslationFontSize()) }
@@ -200,6 +204,39 @@ fun SurahDetailScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = {
+                        if (!isSurahSaved && !isSavingSurah) {
+                            scope.launch {
+                                isSavingSurah = true
+                                try {
+                                    QuranRepository.cacheSurahPayload(context, surahNumber)
+                                    isSurahSaved = true
+                                    Toast.makeText(context, strings.downloaded, Toast.LENGTH_SHORT).show()
+                                } catch (error: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        error.message ?: "Download failed. Check your internet connection.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    isSavingSurah = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isSavingSurah && !isSurahSaved
+                ) {
+                    Text(
+                        text = when {
+                            isSavingSurah -> strings.downloading
+                            isSurahSaved -> strings.downloaded
+                            else -> strings.downloadSurah
+                        },
+                        fontSize = 11.sp
+                    )
+                }
+
                 // Reciter selection button
                 IconButton(onClick = { showReciterDialog = true }) {
                     Icon(
