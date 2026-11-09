@@ -83,7 +83,7 @@ fun HomeScreen(
         }
     }
 
-    val prayers = remember(currentCity, currentTime.get(Calendar.MINUTE)) {
+    val prayers = remember(currentCity, currentTime.get(Calendar.MINUTE), currentTime.get(Calendar.SECOND)) {
         PrayerTimesCalculator.calculate(
             latitude = currentCity.latitude,
             longitude = currentCity.longitude,
