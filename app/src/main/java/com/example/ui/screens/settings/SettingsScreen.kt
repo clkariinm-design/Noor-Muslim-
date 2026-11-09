@@ -1,6 +1,8 @@
 package com.example.ui.screens.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -380,7 +382,7 @@ fun SettingsScreen(
             onDismissRequest = { showAboutDialog = false },
             title = { Text(strings.aboutApp, fontWeight = FontWeight.Bold) },
             text = {
-                Column {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(text = strings.aboutText, fontSize = 14.sp, lineHeight = 20.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(text = strings.developerNote, fontSize = 12.sp, color = IslamicGold, fontWeight = FontWeight.Medium)
