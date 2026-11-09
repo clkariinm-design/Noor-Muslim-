@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -48,23 +47,6 @@ object QuranAudioDownloadManager {
             refreshDownloadedStatuses(context)
             // Audio is cached only when a user starts listening to a surah.
             // This avoids downloading the entire reciter library on first launch.
-        }
-    }
-
-    /**
-     * Quietly fills the local audio cache one Surah at a time.
-     * Failed or unavailable files are skipped; the player streams them on demand.
-     */
-    fun downloadAllSurahsInBackground(context: Context, qari: Qari = AvailableQaris.first()) {
-        val appContext = context.applicationContext
-        scope.launch {
-            for (surah in QuranRepository.allSurahs) {
-                if (isSurahDownloaded(appContext, surah.number, qari.id)) continue
-                downloadSurah(appContext, surah.number, qari)
-                val key = statusKey(surah.number, qari.id)
-                while (activeJobs[key]?.isActive == true) delay(1_000)
-                delay(1_000)
-            }
         }
     }
 
