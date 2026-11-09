@@ -124,14 +124,22 @@ class ExampleUnitTest {
         val qariIds = AvailableQaris.map { it.id }
         assertTrue(qariIds.contains("alafasy"))
         assertTrue(qariIds.contains("abdulbaset"))
-        assertTrue(qariIds.contains("ghamdi"))
+        assertTrue(qariIds.contains("sudais"))
         assertTrue(qariIds.contains("husary"))
+        assertTrue(qariIds.contains("shatri"))
+        assertTrue(qariIds.contains("hudhaify"))
+        assertTrue(qariIds.contains("muaiqly"))
 
         AvailableQaris.forEach { qari ->
             val url = QuranRepository.getAyahAudioUrl(qari, 1, 1)
-            assertTrue("Audio URL must start with https://everyayah.com/data/", url.startsWith("https://everyayah.com/data/"))
-            assertTrue("Audio URL must end with 001001.mp3", url.endsWith("001001.mp3"))
+            assertTrue("Audio URL must use the licensed Islamic Network CDN", url.startsWith("https://cdn.islamic.network/quran/audio/"))
+            assertTrue("Audio URL must identify the selected reciter", url.contains(qari.audioSubfolder))
+            assertTrue("Al-Fatihah first ayah must use global ayah number 1", url.endsWith("/1.mp3"))
         }
+
+        val alafasy = AvailableQaris.first { it.id == "alafasy" }
+        val secondSurahFirstAyah = QuranRepository.getAyahAudioUrl(alafasy, 2, 1)
+        assertTrue("Al-Baqarah first ayah is global ayah 8", secondSurahFirstAyah.endsWith("/8.mp3"))
     }
 
     @Test
