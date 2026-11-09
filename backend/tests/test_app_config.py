@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+# Ensure the backend application module is importable when pytest runs from
+# the backend directory or from the repository root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import main
 
 
