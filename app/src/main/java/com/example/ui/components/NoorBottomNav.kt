@@ -59,7 +59,9 @@ fun NoorBottomNav(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        NoorNavDestination.entries.forEach { destination ->
+        // Keep the primary navigation intentionally simple. Other tools remain
+        // reachable from Home, while Settings stays in one predictable place.
+        listOf(NoorNavDestination.HOME, NoorNavDestination.SETTINGS).forEach { destination ->
             val isSelected = destination == currentDestination
             val label = when (destination) {
                 NoorNavDestination.HOME -> strings.navHome
