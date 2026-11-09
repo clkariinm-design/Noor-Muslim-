@@ -195,11 +195,7 @@ object AudioPlayerManager {
             return
         }
 
-        // Cache only the surah the user is listening to. Playback starts immediately
-        // from the local file when present, otherwise it streams while the surah caches quietly.
-        if (context != null && !QuranAudioDownloadManager.isSurahDownloaded(context, surahNumber, qari.id)) {
-            QuranAudioDownloadManager.downloadSurah(context, surahNumber, qari)
-        }
+        // Playback streams by default. Audio is stored only through an explicit download action.
         val localFile = if (context != null) {
             QuranAudioDownloadManager.getLocalAyahAudioFile(context, qari, surahNumber, ayahNumber)
         } else null
