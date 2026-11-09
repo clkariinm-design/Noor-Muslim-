@@ -8,6 +8,7 @@ import com.example.data.model.CityLocation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.json.JSONObject
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,8 +16,29 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [35])
 class ExampleRobolectricTest {
+
+  @Test
+  fun bundledUthmaniAssetContainsAll114SurahsAnd6236Ayahs() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val root = context.assets.open("quran_uthmani.json")
+      .bufferedReader(Charsets.UTF_8)
+      .use { JSONObject(it.readText()) }
+    val surahs = root.getJSONArray("surahs")
+    assertEquals(114, surahs.length())
+
+    var totalNumberedAyahs = 0
+    for (index in 0 until surahs.length()) {
+      val ayahs = surahs.getJSONObject(index).getJSONArray("ayahs")
+      for (ayahIndex in 0 until ayahs.length()) {
+        if (ayahs.getJSONObject(ayahIndex).getInt("number") > 0) {
+          totalNumberedAyahs++
+        }
+      }
+    }
+    assertEquals(6236, totalNumberedAyahs)
+  }
 
   @Test
   fun testAppNameString() {

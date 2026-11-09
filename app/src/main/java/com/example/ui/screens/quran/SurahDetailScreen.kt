@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.Pause
@@ -79,13 +78,11 @@ import com.example.data.model.AppLanguage
 import com.example.data.model.AudioRepeatMode
 import com.example.data.model.AvailableQaris
 import com.example.data.model.Ayah
-import com.example.data.model.DownloadState
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
 import com.example.data.repository.AudioPlayerManager
 import com.example.data.repository.CurrentPlayingTrack
 import com.example.data.repository.PlaybackState
-import com.example.data.repository.QuranAudioDownloadManager
 import com.example.data.repository.QuranRepository
 import com.example.ui.theme.AmiriFontFamily
 import com.example.ui.theme.IslamicEmerald
@@ -124,15 +121,9 @@ fun SurahDetailScreen(
     val repeatMode by AudioPlayerManager.repeatMode.collectAsState()
     val currentPositionMs by AudioPlayerManager.currentPositionMs.collectAsState()
     val durationMs by AudioPlayerManager.durationMs.collectAsState()
-    val downloadStatuses by QuranAudioDownloadManager.downloadStatuses.collectAsState()
-
-    val downloadKey = "${selectedQari.id}_${surah.number}"
-    val downloadStatus = downloadStatuses[downloadKey]
-    val isDownloaded = downloadStatus?.state == DownloadState.COMPLETED || QuranAudioDownloadManager.isSurahDownloaded(context, surah.number, selectedQari.id)
-    val isDownloading = downloadStatus?.state == DownloadState.DOWNLOADING
-
     var ayahs by remember { mutableStateOf<List<Ayah>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showReciterDialog by remember { mutableStateOf(false) }
 
@@ -142,11 +133,16 @@ fun SurahDetailScreen(
     // Load Ayahs
     LaunchedEffect(surahNumber, selectedQari) {
         isLoading = true
-        ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
-        isLoading = false
-
-        // Record Last Read
-        appPreferences.setLastRead(surah.number, surah.nameEnglish, 1)
+        loadError = null
+        try {
+            ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
+            appPreferences.setLastRead(surah.number, surah.nameEnglish, 1)
+        } catch (error: Exception) {
+            ayahs = emptyList()
+            loadError = error.message
+        } finally {
+            isLoading = false
+        }
     }
 
     // Connect auto-play next Ayah
@@ -288,8 +284,15 @@ fun SurahDetailScreen(
                             onClick = {
                                 scope.launch {
                                     isLoading = true
-                                    ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
-                                    isLoading = false
+                                    loadError = null
+                                    try {
+                                        ayahs = QuranRepository.getSurahAyahs(context, surahNumber, selectedQari)
+                                    } catch (error: Exception) {
+                                        ayahs = emptyList()
+                                        loadError = error.message
+                                    } finally {
+                                        isLoading = false
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = IslamicEmerald)
@@ -306,7 +309,7 @@ fun SurahDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
-                    // The bundled Uthmani text already includes each surah's basmala where applicable.
+                    // Quran text is fetched online from the Noor Muslim Quran service.
 
                     // Ayah Items
                     items(ayahs, key = { it.numberInSurah }) { ayah ->

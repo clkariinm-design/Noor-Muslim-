@@ -8,6 +8,7 @@ import com.example.data.model.Qari
 import com.example.data.model.Surah
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -172,8 +173,9 @@ object QuranRepository {
     private val memoryCache = mutableMapOf<Int, List<Ayah>>()
 
     /**
-     * Loads the original Uthmani Quran text bundled in the APK.
-     * This path never requires an internet connection.
+     * Offline-first Quran reading. A validated network payload is cached privately;
+     * if the service is unavailable, the bundled Tanzil Uthmani text is used immediately.
+     * Translations are available when supplied by the online payload; the bundled asset is Arabic-only.
      */
     suspend fun getSurahAyahs(
         context: Context,
@@ -189,62 +191,138 @@ object QuranRepository {
             }
         }
 
-        val allText = getBundledQuranLines(context)
-        val startIndex = allSurahs.takeWhile { it.number != surahNumber }.sumOf { it.ayahCount }
-        val endIndex = startIndex + surah.ayahCount
-        require(endIndex <= allText.size) { "Bundled Quran text is incomplete" }
+        val cacheFile = surahCacheFile(context, surahNumber)
+        val cachedJson = cacheFile.takeIf { it.isFile && it.length() > 0L }
+            ?.readText(Charsets.UTF_8)
 
-        // Previously downloaded translation cache may be reused, but Arabic always
-        // comes from the immutable Tanzil asset bundled with the application.
-        val translationFile = File(context.cacheDir, "surah_$surahNumber.json")
-        val cachedTranslations = try {
-            if (translationFile.exists()) parseAyahsJson(
-                translationFile.readText(),
-                surahNumber,
-                selectedQari
-            ) else emptyList()
-        } catch (_: Exception) {
-            emptyList()
+        val json = cachedJson ?: try {
+            cacheSurahPayload(context, surahNumber)
+            cacheFile.readText(Charsets.UTF_8)
+        } catch (error: Exception) {
+            if (cacheFile.isFile && cacheFile.length() > 0L) {
+                cacheFile.readText(Charsets.UTF_8)
+            } else {
+                throw error
+            }
         }
 
-        val ayahs = allText.subList(startIndex, endIndex).mapIndexed { index, arabicText ->
-            val translated = cachedTranslations.getOrNull(index)
-            Ayah(
-                numberInSurah = index + 1,
-                textArabic = arabicText,
-                translationEn = translated?.translationEn.orEmpty(),
-                translationSo = translated?.translationSo.orEmpty(),
-                translationTr = translated?.translationTr.orEmpty(),
-                translationFr = translated?.translationFr.orEmpty(),
-                audioUrl = getAyahAudioUrl(selectedQari, surahNumber, index + 1)
-            )
+        val ayahs = parseAyahsJson(json, surahNumber, selectedQari)
+        check(ayahs.size == surah.ayahCount) {
+            "Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${ayahs.size}"
         }
-
         memoryCache[surahNumber] = ayahs
         ayahs
     }
 
-    @Volatile
-    private var bundledQuranLines: List<String>? = null
-
-    private fun getBundledQuranLines(context: Context): List<String> {
-        bundledQuranLines?.let { return it }
-        synchronized(this) {
-            bundledQuranLines?.let { return it }
-            val lines = context.assets.open("quran-uthmani-1.1.txt")
-                .bufferedReader(Charsets.UTF_8)
-                .useLines { sequence ->
-                    sequence.filter { line ->
-                        line.isNotBlank() && !line.startsWith("#")
-                    }.toList()
-                }
-            val expectedAyahs = allSurahs.sumOf { it.ayahCount }
-            check(lines.size == expectedAyahs && expectedAyahs == 6236) {
-                "Bundled Quran text validation failed: expected $expectedAyahs ayahs, found ${lines.size}"
-            }
-            bundledQuranLines = lines
-            return lines
+    /**
+     * Downloads and persists a validated surah payload for offline reading.
+     * The cache is private to the app and is never exposed as a public file.
+     */
+    suspend fun cacheSurahPayload(context: Context, surahNumber: Int) = withContext(Dispatchers.IO) {
+        require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
+        val surah = allSurahs.first { it.number == surahNumber }
+        val target = surahCacheFile(context, surahNumber)
+        if (target.isFile && target.length() > 0L && hasCompleteTranslations(context, surahNumber)) {
+            return@withContext
         }
+
+        // Prefer the online payload (including available translations), but never block
+        // Quran reading when the user is offline: the verified Arabic text ships in assets.
+        val payload = try {
+            com.example.data.remote.SupabaseQuranApi.getSurahPayload(surahNumber)
+        } catch (_: Exception) {
+            bundledSurahPayload(context, surahNumber)
+        }
+        val validated = parseAyahsJson(payload.toString(), surahNumber, AvailableQaris[0])
+        check(validated.size == surah.ayahCount) {
+            "Quran response incomplete for surah $surahNumber: expected ${surah.ayahCount}, received ${validated.size}"
+        }
+
+        target.parentFile?.mkdirs()
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        temporary.writeText(payload.toString(), Charsets.UTF_8)
+        if (!temporary.renameTo(target)) {
+            target.writeText(payload.toString(), Charsets.UTF_8)
+            temporary.delete()
+        }
+    }
+
+    fun hasCompleteTranslations(context: Context, surahNumber: Int): Boolean {
+        if (surahNumber !in 1..114) return false
+        val file = surahCacheFile(context, surahNumber)
+        if (!file.isFile || file.length() <= 0L) return false
+        return try {
+            val data = JSONObject(file.readText(Charsets.UTF_8)).getJSONArray("data")
+            val required = listOf("english_saheeh", "somali_yacob", "turkish_rwwad", "french_rashid")
+            val expectedAyahs = allSurahs.first { it.number == surahNumber }.ayahCount
+            val complete = mutableSetOf<String>()
+            for (i in 0 until data.length()) {
+                val edition = data.getJSONObject(i)
+                val identifier = edition.getJSONObject("edition").optString("identifier")
+                if (identifier in required && edition.optJSONArray("ayahs")?.length() == expectedAyahs) {
+                    complete.add(identifier)
+                }
+            }
+            complete.containsAll(required)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun isSurahCached(context: Context, surahNumber: Int): Boolean {
+        if (surahNumber !in 1..114) return false
+        val file = surahCacheFile(context, surahNumber)
+        return file.isFile && file.length() > 0L
+    }
+
+    private fun surahCacheFile(context: Context, surahNumber: Int): File =
+        File(File(context.filesDir, "quran_cache"), "surah_${surahNumber}.json")
+
+    private val bundledPayloadLock = Any()
+
+    @Volatile
+    private var bundledPayloads: Map<Int, JSONObject>? = null
+
+    /**
+     * Converts the verbatim Tanzil asset into the same read-only payload shape used by
+     * the online parser. Ayah number 0 is the separately-listed basmalah marker and is
+     * omitted so each surah contains its canonical numbered ayahs only.
+     */
+    private fun bundledSurahPayload(context: Context, surahNumber: Int): JSONObject {
+        val payloads = bundledPayloads ?: synchronized(bundledPayloadLock) {
+            bundledPayloads ?: run {
+                val source = context.assets.open("quran_uthmani.json")
+                    .bufferedReader(Charsets.UTF_8)
+                    .use { JSONObject(it.readText()) }
+                val surahs = source.getJSONArray("surahs")
+                val parsed = mutableMapOf<Int, JSONObject>()
+
+                for (i in 0 until surahs.length()) {
+                    val surah = surahs.getJSONObject(i)
+                    val number = surah.getInt("number")
+                    val sourceAyahs = surah.getJSONArray("ayahs")
+                    val ayahs = JSONArray()
+                    for (j in 0 until sourceAyahs.length()) {
+                        val sourceAyah = sourceAyahs.getJSONObject(j)
+                        val ayahNumber = sourceAyah.getInt("number")
+                        if (ayahNumber > 0) {
+                            ayahs.put(
+                                JSONObject()
+                                    .put("numberInSurah", ayahNumber)
+                                    .put("text", sourceAyah.getString("text"))
+                            )
+                        }
+                    }
+
+                    val edition = JSONObject().put("identifier", "quran-uthmani")
+                    val data = JSONObject().put("edition", edition).put("ayahs", ayahs)
+                    parsed[number] = JSONObject().put("data", JSONArray().put(data))
+                }
+                parsed.toMap().also { bundledPayloads = it }
+            }
+        }
+        return payloads[surahNumber]
+            ?: throw IllegalStateException("Bundled Quran text is missing surah $surahNumber")
     }
 
     private fun parseAyahsJson(jsonString: String, surahNumber: Int, selectedQari: Qari): List<Ayah> {
@@ -262,10 +340,10 @@ object QuranRepository {
             val identifier = ed.getJSONObject("edition").getString("identifier")
             when {
                 identifier.contains("quran-uthmani") -> arabicEd = ed
-                identifier.contains("en.sahih") -> enEd = ed
-                identifier.contains("so.abduh") -> soEd = ed
-                identifier.contains("tr.diyanet") -> trEd = ed
-                identifier.contains("fr.hamidullah") -> frEd = ed
+                identifier.contains("english_saheeh") || identifier.contains("en.sahih") -> enEd = ed
+                identifier.contains("somali_yacob") || identifier.contains("so.abduh") -> soEd = ed
+                identifier.contains("turkish_rwwad") || identifier.contains("tr.diyanet") -> trEd = ed
+                identifier.contains("french_rashid") || identifier.contains("fr.hamidullah") -> frEd = ed
             }
         }
 
@@ -304,106 +382,19 @@ object QuranRepository {
     }
 
     fun getAyahAudioUrl(qari: Qari, surahNumber: Int, ayahNumber: Int): String {
-        val sStr = String.format("%03d", surahNumber)
-        val aStr = String.format("%03d", ayahNumber)
-        return "https://everyayah.com/data/${qari.audioSubfolder}/$sStr$aStr.mp3"
+        val surah = allSurahs.firstOrNull { it.number == surahNumber }
+            ?: throw IllegalArgumentException("Invalid surah number")
+        require(ayahNumber in 1..surah.ayahCount) { "Invalid ayah number" }
+        val globalAyahNumber = allSurahs
+            .asSequence()
+            .takeWhile { it.number < surahNumber }
+            .sumOf { it.ayahCount } + ayahNumber
+        val bitrate = when (qari.id) {
+            "abdulbaset" -> 64
+            "sudais" -> 192
+            else -> 128
+        }
+        return "https://cdn.islamic.network/quran/audio/$bitrate/${qari.audioSubfolder}/$globalAyahNumber.mp3"
     }
 
-    /**
-     * Bundled verified authentic Surahs for offline instant access (Al-Fatihah, Al-Ikhlas, Al-Falaq, An-Nas, Al-Kawthar, Al-Asr, Al-Kafirun).
-     */
-    private fun getBundledSurah(surahNumber: Int, qari: Qari): List<Ayah> {
-        return when (surahNumber) {
-            1 -> listOf(
-                Ayah(1, "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "In the name of Allah, the Entirely Merciful, the Especially Merciful.", "Magaca Eebe yaan ku bilaabaynaa ee Naxariis Guud iyo mid Gaaraba Naxariista.", "Rahmân ve Rahîm olan Allah'ın adıyla.", "Au nom d'Allah, le Tout Miséricordieux, le Très Miséricordieux.", getAyahAudioUrl(qari, 1, 1)),
-                Ayah(2, "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ", "[All] praise is [due] to Allah, Lord of the worlds -", "Mahad Eebaa iska leh ee Eebaha Caalamka ah.", "Hamd, Âlemlerin Rabbi olan Allah'a mahsustur.", "Louange à Allah, Seigneur de l'univers.", getAyahAudioUrl(qari, 1, 2)),
-                Ayah(3, "الرَّحْمَٰنِ الرَّحِيمِ", "The Entirely Merciful, the Especially Merciful,", "Ee Naxariis Guud iyo mid Gaaraba Naxariista.", "O, Rahmândır ve Rahîmdir.", "Le Tout Miséricordieux, le Très Miséricordieux,", getAyahAudioUrl(qari, 1, 3)),
-                Ayah(4, "مَالِكِ يَوْمِ الدِّينِ", "Sovereign of the Day of Recompense.", "Ee Xukunka Maalinta Abaalmarinta leh.", "Din (hesap ve ceza) gününün sahibidir.", "Maître du Jour de la rétribution.", getAyahAudioUrl(qari, 1, 4)),
-                Ayah(5, "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ", "It is You we worship and You we ask for help.", "Adiga kaliya yaan ku caabudaynaa, adigana kaliya yaan kaalmo kaa baryaynaa.", "(Rabbimiz!) Yalnız sana kulluk eder ve yalnız senden yardım dileriz.", "C'est Toi [Seul] que nous adorons, et c'est Toi [Seul] dont nous implorons secours.", getAyahAudioUrl(qari, 1, 5)),
-                Ayah(6, "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ", "Guide us to the straight path -", "Nagu hanuuni jidka toosan.", "Bizi doğru yola ilet.", "Guide-nous dans le droit chemin,", getAyahAudioUrl(qari, 1, 6)),
-                Ayah(7, "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ", "The path of those upon whom You have bestowed favor, not of those who have evoked [Your] anger or of those who are astray.", "Jidka kuwii aad u nicmaysay aan ahayn kuwa loo cadhooday iyo kuwa haboobay midna.", "Kendilerine lütufta bulunduğun kimselerin yoluna; gazaba uğramışların ve sapmışların yoluna değil.", "le chemin de ceux que Tu as comblés de faveurs, non pas de ceux qui ont encouru Ta colère, ni des égarés.", getAyahAudioUrl(qari, 1, 7))
-            )
-            112 -> listOf(
-                Ayah(1, "قُلْ هُوَ اللَّهُ أَحَدٌ", "Say, \"He is Allah, [who is] One,", "Waxaad dhahdaa: Eebe waa Kow.", "De ki: O, Allah'tır, bir tektir.", "Dis: «Il est Allah, Unique.", getAyahAudioUrl(qari, 112, 1)),
-                Ayah(2, "اللَّهُ الصَّمَدُ", "Allah, the Eternal Refuge.", "Eebe waa kan baahida loo qabo oo aan cidna u baahnayn.", "Allah Samed'dir (her şey O'na muhtaçtır, O hiçbir şeye muhtaç değildir).", "Allah, Le Seul à être imploré pour ce que nous désirons.", getAyahAudioUrl(qari, 112, 2)),
-                Ayah(3, "لَمْ يَلِدْ وَلَمْ يُولَدْ", "He neither begets nor is born,", "Wax ma dhalin isna lama dhalin.", "O, doğurmamış ve doğmamıştır.", "Il n'a jamais engendré, n'a pas été engendré non plus.", getAyahAudioUrl(qari, 112, 3)),
-                Ayah(4, "وَلَمْ يَكُنْ لَهُ كُفُوًا أَحَدٌ", "Nor is there to Him any equivalent.\"", "Mana jiro mid u dhigma haba yaraatee.", "Hiçbir şey O'na denk ve benzer değildir.", "Et nul n'est égal à Lui».", getAyahAudioUrl(qari, 112, 4))
-            )
-            113 -> listOf(
-                Ayah(1, "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ", "Say, \"I seek refuge in the Lord of daybreak", "Waxaad dhahdaa: waxaan magan galaa Eebaha waaga baryaya,", "De ki: Sabahın Rabbine sığınırım,", "Dis: «Je cherche protection auprès du Seigneur de l'aube naissante,", getAyahAudioUrl(qari, 113, 1)),
-                Ayah(2, "مِنْ شَرِّ مَا خَلَقَ", "From the evil of that which He created", "Sharciiga wuxuu abuuray oo dhan,", "Yarattığı şeylerin şerrinden,", "contre le mal des êtres qu'Il a créés,", getAyahAudioUrl(qari, 113, 2)),
-                Ayah(3, "وَمِنْ شَرِّ غَاسِقٍ إِذَا وَقَبَ", "And from the evil of darkness when it settles", "Iyo sharka habeenka marka uu madoobaado,", "Karanlığı çöktüğü zaman gecenin şerrinden,", "contre le mal de l'obscurité quand elle s'approfondit,", getAyahAudioUrl(qari, 113, 3)),
-                Ayah(4, "وَمِنْ شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ", "And from the evil of the blowers in knots", "Iyo sharka kuwa guntimaha afuufa (saaxiriinta),", "Düğümlere üfürenlerin şerrinden,", "contre le mal de celles qui soufflent [les sorcières] sur les nœuds,", getAyahAudioUrl(qari, 113, 4)),
-                Ayah(5, "وَمِنْ شَرِّ حَاسِدٍ إِذَا حَسَدَ", "And from the evil of an envier when he envies.\"", "Iyo sharka xaasidka marka uu wax xaasido.", "Ve haset ettiği zaman hasetçinin şerrinden.", "et contre le mal de l'envieux quand il envie».", getAyahAudioUrl(qari, 113, 5))
-            )
-            114 -> listOf(
-                Ayah(1, "قُلْ أَعُوذُ بِرَبِّ النَّاسِ", "Say, \"I seek refuge in the Lord of mankind,", "Waxaad dhahdaa: waxaan magan galaa Eebaha dadka,", "De ki: İnsanların Rabbine sığınırım,", "Dis: «Je cherche protection auprès du Seigneur des hommes,", getAyahAudioUrl(qari, 114, 1)),
-                Ayah(2, "مَلِكِ النَّاسِ", "The Sovereign of mankind,", "Boqorka dadka,", "İnsanların hükümranına,", "Le Souverain des hommes,", getAyahAudioUrl(qari, 114, 2)),
-                Ayah(3, "إِلَٰهِ النَّاسِ", "The God of mankind,", "Ilaaha dadka,", "İnsanların ilâhına,", "L'Élu des hommes,", getAyahAudioUrl(qari, 114, 3)),
-                Ayah(4, "مِنْ شَرِّ الْوَسْوَاسِ الْخَنَّاسِ", "From the evil of the retreating whisperer -", "Sharka waswaasiyaha dib u guranaya,", "Sinsice kalplere vesvese verenin şerrinden,", "contre le mal du mauvais conseiller, furtif,", getAyahAudioUrl(qari, 114, 4)),
-                Ayah(5, "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ", "Who whispers [evil] into the breasts of mankind -", "Kaasoo ku waswaasiya laabaha dadka,", "O ki, insanların göğüslerine vesvese verir,", "qui souffle le mal dans les poitrines des hommes,", getAyahAudioUrl(qari, 114, 5)),
-                Ayah(6, "مِنَ الْجِنَّةِ وَالنَّاسِ", "From among the jinn and mankind.\"", "Hadday jinka ka mid yihiin ama dadka.", "Gerek cinlerden, gerek insanlardan.", "qu'il soit, [ce conseiller], parmi les djinns ou les hommes».", getAyahAudioUrl(qari, 114, 6))
-            )
-            108 -> listOf(
-                Ayah(1, "إِنَّا أَعْطَيْنَاكَ الْكَوْثَرَ", "Indeed, We have granted you, [O Muhammad], al-Kawthar.", "Waxaan ku siinay khayr badan oo aan go'ayn (Kawthar).", "Şüphesiz biz sana Kevser'i verdik.", "Nous t'avons certes, accordé l'Abondance.", getAyahAudioUrl(qari, 108, 1)),
-                Ayah(2, "فَصَلِّ لِرَبِّكَ وَانْحَرْ", "So pray to your Lord and sacrifice [to Him alone].", "Ee Rabbigaa u tuko una gowrac.", "Şimdi sen Rabbine kulluk et ve kurban kes.", "Accomplis donc la Salât pour ton Seigneur et sacrifie.", getAyahAudioUrl(qari, 108, 2)),
-                Ayah(3, "إِنَّ شَانِئَكَ هُوَ الْأَبْتَرُ", "Indeed, your enemy is the one cut off.", "Qofka ku neceb ayaa ah midka go'an ee khayrka laga xayuubiyay.", "Doğrusu sana kin besleyendir soyu kesik olan.", "Certes, celui qui te hait sera sans postérité.", getAyahAudioUrl(qari, 108, 3))
-            )
-            103 -> listOf(
-                Ayah(1, "وَالْعَصْرِ", "By time,", "Waxaan ku dhaartay xilliga,", "Asra yemin olsun ki,", "Par le Temps!", getAyahAudioUrl(qari, 103, 1)),
-                Ayah(2, "إِنَّ الْإِنْسَانَ لَفِي خُسْرٍ", "Indeed, mankind is in loss,", "Dadka oo dhami khasaare ayay ku jiraan,", "İnsan gerçekten ziyan içindedir.", "L'homme est certes, en perdition,", getAyahAudioUrl(qari, 103, 2)),
-                Ayah(3, "إِلَّا الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ وَتَوَاصَوْا بِالْحَقِّ وَتَوَاصَوْا بِالصَّبْرِ", "Except for those who have believed and done righteous deeds and advised each other to truth and advised each other to patience.", "Marka laga reebo kuwa rumeeyey xaqa oo falay camal suuban, iskuna dardaarmay xaqa iyo samirka.", "Ancak iman edip iyi ameller işleyenler, birbirlerine hakkı tavsiye edenler ve sabrı tavsiye edenler müstesnadır.", "sauf ceux qui croient et accomplissent les bonnes œuvres, s'enjoignent mutuellement la vérité et s'enjoignent mutuellement l'endurance.", getAyahAudioUrl(qari, 103, 3))
-            )
-            109 -> listOf(
-                Ayah(1, "قُلْ يَا أَيُّهَا الْكَافِرُونَ", "Say, \"O disbelievers,", "Waxaad dhahdaa: Kuwa Gaalada ahow,", "De ki: Ey kâfirler!", "Dis: «Ô vous les infidèles!", getAyahAudioUrl(qari, 109, 1)),
-                Ayah(2, "لَا أَعْبُدُ مَا تَعْبُدُونَ", "I do not worship what you worship.", "Ma caabudo waxaad caabudaysaan,", "Ben sizin kulluk ettiklerinize kulluk etmem.", "Je n'adore pas ce que vous adorez.", getAyahAudioUrl(qari, 109, 2)),
-                Ayah(3, "وَلَا أَنْتُمْ عَابِدُونَ مَا أَعْبُدُ", "Nor are you worshippers of what I worship.", "Idinkuna ma caabudaysaan waxaan caabudo,", "Siz de benim kulluk ettiğime kulluk edecek değilsiniz.", "Et vous n'êtes pas adorateurs de ce que j'adore.", getAyahAudioUrl(qari, 109, 3)),
-                Ayah(4, "وَلَا أَنَا عَابِدٌ مَا عَبَدْتُمْ", "Nor will I be a worshipper of what you worship.", "Mana noqonayo mid caabuda waxaad caabuddeen,", "Ben de sizin kulluk ettiklerinize kulluk edecek değilim.", "Je ne suis pas adorateur de ce que vous avez adoré.", getAyahAudioUrl(qari, 109, 4)),
-                Ayah(5, "وَلَا أَنْتُمْ عَابِدُونَ مَا أَعْبُدُ", "Nor will you be worshippers of what I worship.", "Idinkuna ma noqonaysaan kuwo caabuda waxaan caabudo,", "Siz de benim kulluk ettiğime kulluk edecek değilsiniz.", "Et vous n'êtes pas adorateurs de ce que j'adore.", getAyahAudioUrl(qari, 109, 5)),
-                Ayah(6, "لَكُمْ دِينُكُمْ وَلِيَ دِينِ", "For you is your religion, and for me is my religion.\"", "Waxaad leedihiin diintiinna, anna diintaydaan leeyahay.", "Sizin dininiz size, benim dinim banadır.", "A vous votre religion, et à moi ma religion».", getAyahAudioUrl(qari, 109, 6))
-            )
-            110 -> listOf(
-                Ayah(1, "إِذَا جَاءَ نَصْرُ اللَّهِ وَالْفَتْحُ", "When the victory of Allah has come and the conquest,", "Markuu yimaado gargaarka Eebbe iyo furashadu (Makka),", "Allah'ın yardımı ve fetih geldiği,", "Lorsque vient le secours d'Allah ainsi que la victoire,", getAyahAudioUrl(qari, 110, 1)),
-                Ayah(2, "وَرَأَيْتَ النَّاسَ يَدْخُلُونَ فِي دِينِ اللَّهِ أَفْوَاجًا", "And you see the people entering into the religion of Allah in multitudes,", "Ood aragto dadka oo diinta Eebbe u gelaya koox-koox,", "Ve insanların dalga dalga Allah'ın dinine girdiklerini gördüğün zaman,", "et que tu vois les gens entrer avec foule dans la religion d'Allah,", getAyahAudioUrl(qari, 110, 2)),
-                Ayah(3, "فَسَبِّحْ بِحَمْدِ رَبِّكَ وَاسْتَغْفِرْهُ ۚ إِنَّهُ كَانَ تَوَّابًا", "Then exalt [Him] with praise of your Lord and ask forgiveness of Him. Indeed, He is ever Accepting of repentance.", "U tasbiixso adoo mahadinaya Rabbigaa dambi-dhaafna weydiiso, Eebbe waa mid toobada aqbal badane.", "Hemen Rabbini hamd ile tesbih et ve O'ndan mağfiret dile. Çünkü O, tevbeleri çok kabul edendir.", "alors, par la louange, célèbre la gloire de ton Seigneur et implore Son pardon. Car c'est Lui le grand Accueillant au repentir.", getAyahAudioUrl(qari, 110, 3))
-            )
-            111 -> listOf(
-                Ayah(1, "تَبَّتْ يَدَا أَبِي لَهَبٍ وَتَبَّ", "May the hands of Abu Lahab be ruined, and ruined is he.", "Waxaa khasaaray labada gacmood ee Abii Lahab isna wuu khasaaray.", "Ebû Leheb'in iki eli kurusun! Kurudu da.", "Que périssent les deux mains d'Abu-Lahab, et que lui-même périsse.", getAyahAudioUrl(qari, 111, 1)),
-                Ayah(2, "مَا أَغْنَىٰ عَنْهُ مَالُهُ وَمَا كَسَبَ", "His wealth will not avail him or that which he gained.", "Waxba uma tarin xoolihiisu iyo wuxuu kasbaday toona.", "Ona ne malı fayda verdi, ne de kazandığı.", "Sa fortune ne lui a servi à rien, ni ce qu'il a acquis.", getAyahAudioUrl(qari, 111, 2)),
-                Ayah(3, "سَيَصْلَىٰ نَارًا ذَاتَ لَهَبٍ", "He will [enter to] burn in a Fire of [blazing] flame", "Wuxuu geli doonaa naar ololaysa,", "O, alevli bir ateşe girecektir.", "Il sera brûlé dans un Feu plein de flammes,", getAyahAudioUrl(qari, 111, 3)),
-                Ayah(4, "وَامْرَأَتُهُ حَمَّالَةَ الْحَطَبِ", "And his wife [as well] - the carrier of firewood.", "Iyo haweeneydiisa qoryaha u sida (sharta iyo fidnada).", "Boynunda bükülmüş urganla odun taşıyıcı olarak karısı da.", "de même sa femme, la porteuse de bois,", getAyahAudioUrl(qari, 111, 4)),
-                Ayah(5, "فِي جِيدِهَا حَبْلٌ مِنْ مَسَدٍ", "Around her neck is a rope of [twisted] fiber.", "Waxaa qoorteeda ku xirnaan xadhig liif ah.", "Boynunda sağlam bükülmüş bir ip olduğu halde.", "à son cou, une corde de fibres.", getAyahAudioUrl(qari, 111, 5))
-            )
-            105 -> listOf(
-                Ayah(1, "أَلَمْ تَرَ كَيْفَ فَعَلَ رَبُّكَ بِأَصْحَابِ الْفِيلِ", "Have you not considered, [O Muhammad], how your Lord dealt with the companions of the elephant?", "Miyaadan arag sida Rabbigaa ku sameeyey asxaabtii maroodiga?", "Görmedin mi Rabbin fil sahiplerine ne yaptı?", "N'as-tu pas vu comment ton Seigneur a agi envers les gens de l'Eléphant?", getAyahAudioUrl(qari, 105, 1)),
-                Ayah(2, "أَلَمْ يَجْعَلْ كَيْدَهُمْ فِي تَضْلِيلٍ", "Did He not make their plan into misguidance?", "Miyuusan dhigin dhagartooda khasaare?", "Onların tuzaklarını boşa çıkarmadı mı?", "N'a-t-Il pas rendu leur ruse complètement vaine?", getAyahAudioUrl(qari, 105, 2)),
-                Ayah(3, "وَأَرْسَلَ عَلَيْهِمْ طَيْرًا أَبَابِيلَ", "And He sent against them birds in flocks,", "Wuxuuna ku diray shimbiro koox-koox ah,", "Üzerlerine sürü sürü kuşlar gönderdi.", "et envoyé sur eux des oiseaux par volées,", getAyahAudioUrl(qari, 105, 3)),
-                Ayah(4, "تَرْمِيهِمْ بِحِجَارَةٍ مِنْ سِجِّيلٍ", "Striking them with stones of hard clay,", "Kuwaasoo ku tuurayay dhagaxyo dhoobo gubatay ah,", "Onlara çamurdan sertleşmiş taşlar atan.", "qui leur lançaient des pierres d'argile,", getAyahAudioUrl(qari, 105, 4)),
-                Ayah(5, "فَجَعَلَهُمْ كَعَصْفٍ مَأْكُولٍ", "And He made them like eaten straw.", "Wuxuuna ka dhigay sida baal la cunay.", "Nihayet onları yenilmiş ekin yaprağı gibi yaptı.", "et Il les a rendus semblables à une paille mâchée.", getAyahAudioUrl(qari, 105, 5))
-            )
-            106 -> listOf(
-                Ayah(1, "لِإِيلَافِ قُرَيْشٍ", "For the accustomed security of the Quraysh -", "Isku xirnaanta iyo barwaaqada reer Qureysh awgeed,", "Kureyş'in güvenliği için,", "A cause du pacte des Quraysh,", getAyahAudioUrl(qari, 106, 1)),
-                Ayah(2, "إِيلَافِهِمْ رِحْلَةَ الشِّتَاءِ وَالصَّيْفِ", "Their accustomed security [in] the caravan of winter and summer -", "Isku xirnaanta socdaalkooda jiilaalka iyo gu'ga,", "Kış ve yaz seferlerinde onların güvenliğini sağladığı için,", "de leur pacte des voyages d'hiver et d'été.", getAyahAudioUrl(qari, 106, 2)),
-                Ayah(3, "فَلْيَعْبُدُوا رَبَّ هَٰذَا الْبَيْتِ", "Let them worship the Lord of this House,", "Haddaba ha caabudeen Eebaha Gurigan (Kacbada),", "Şu evin (Kâbe'nin) Rabbine kulluk etsinler.", "Qu'ils adorent donc le Seigneur de cette Maison (la Ka'ba),", getAyahAudioUrl(qari, 106, 3)),
-                Ayah(4, "الَّذِي أَطْعَمَهُمْ مِنْ جُوعٍ وَآمَنَهُمْ مِنْ خَوْفٍ", "Who has fed them, [saving them] from hunger and made them safe, [saving them] from fear.", "Kii cuntada ka siiyey baahida, kana nabadgeliyey cabsida.", "O ki, onları açlıktan doyurdu ve korkudan emin kıldı.", "qui les a nourris contre la faim et rassurés de la peur!", getAyahAudioUrl(qari, 106, 4))
-            )
-            107 -> listOf(
-                Ayah(1, "أَرَأَيْتَ الَّذِي يُكَذِّبُ بِالدِّينِ", "Have you not considered him who denies the Recompense?", "Miyaad aragtay qofka beeninaya abaalmarinta (Aakhiro)?", "Dini (hesap gününü) yalanlayanı gördün mü?", "Vois-tu celui qui traite de mensonge la Rétribution?", getAyahAudioUrl(qari, 107, 1)),
-                Ayah(2, "فَذَٰلِكَ الَّذِي يَدُعُّ الْيَتِيمَ", "For that is the one who drives away the orphan", "Kaasi waa kan erya agoonka (oo dhibaateeya),", "İşte o, öksüzü itip kakar.", "C'est bien lui qui repousse l'orphelin,", getAyahAudioUrl(qari, 107, 2)),
-                Ayah(3, "وَلَا يَحُضُّ عَلَىٰ طَعَامِ الْمِسْكِينِ", "And does not encourage the feeding of the poor.", "Aanna ku dhiirrigelin quudinta masaakiinta.", "Ve yoksulu doyurmaya teşvik etmez.", "et qui n'encourage point à nourrir le pauvre.", getAyahAudioUrl(qari, 107, 3)),
-                Ayah(4, "فَوَيْلٌ لِلْمُصَلِّينَ", "So woe to those who pray", "Halaag baa u sugnaaday kuwa tukanaya,", "Yazıklar olsun o namaz kılanlara ki,", "Malheur donc, à ceux qui prient", getAyahAudioUrl(qari, 107, 4)),
-                Ayah(5, "الَّذِينَ هُمْ عَنْ صَلَاتِهِمْ سَاهُونَ", "[But] who are heedless of their prayer -", "Ee ka halmaansan salaaddooda (oo dayaca),", "Onlar namazlarından gafildirler.", "tout en étant négligents avec leur Salât,", getAyahAudioUrl(qari, 107, 5)),
-                Ayah(6, "الَّذِينَ هُمْ يُرَاءُونَ", "Those who make a show [of their deeds]", "Kuwii is tus-tuska samaynaya,", "Onlar gösteriş yaparlar.", "qui sont pleins d'ostentation,", getAyahAudioUrl(qari, 107, 6)),
-                Ayah(7, "وَيَمْنَعُونَ الْمَاعُونَ", "And withhold [simple] assistance.", "Ee diidaya gargaarka yar (alaabta yar).", "Ve en ufak bir yardımı dahi esirgerler.", "et refusent l'ustensile [le moindre secours]!", getAyahAudioUrl(qari, 107, 7))
-            )
-            97 -> listOf(
-                Ayah(1, "إِنَّا أَنْزَلْنَاهُ فِي لَيْلَةِ الْقَدْرِ", "Indeed, We sent the Qur'an down during the Night of Decree.", "Waxaan soo dejinnay Quraanka habeenka laylatul-qadriga.", "Şüphesiz, biz onu (Kur'an'ı) Kadir gecesinde indirdik.", "Nous l'avons certes, fait descendre pendant la nuit d'Al-Qadr.", getAyahAudioUrl(qari, 97, 1)),
-                Ayah(2, "وَمَا أَدْرَاكَ مَا لَيْلَةُ الْقَدْرِ", "And what can make you know what is the Night of Decree?", "Maxaase ku ogeysiiyey waxa uu yahay laylatul-qadrigu?", "Kadir gecesinin ne olduğunu sen ne bileceksin!", "Et qui te dira ce qu'est la nuit d'Al-Qadr?", getAyahAudioUrl(qari, 97, 2)),
-                Ayah(3, "لَيْلَةُ الْقَدْرِ خَيْرٌ مِنْ أَلْفِ شَهْرٍ", "The Night of Decree is better than a thousand months.", "Habeenka laylatul-qadrigu wuxuu ka khayr badan yahay kun bilood.", "Kadir gecesi bin aydan daha hayırlıdır.", "La nuit d'Al-Qadr est meilleure que mille mois.", getAyahAudioUrl(qari, 97, 3)),
-                Ayah(4, "تَنَزَّلُ الْمَلَائِكَةُ وَالرُّوحُ فِيهَا بِإِذْنِ رَبِّهِمْ مِنْ كُلِّ أَمْرٍ", "The angels and the Spirit descend therein by permission of their Lord for every matter.", "Waxaa soo dega malaa'igta iyo Jibriil habeenkaas amar kasta ogolaanshaha Rabbigood awgeed.", "Melekler ve Ruh (Cebrail) o gecede, Rablerinin izniyle her türlü iş için iner de iner.", "Durant celle-ci descendent les Anges ainsi que l'Esprit, par permission de leur Seigneur pour tout ordre.", getAyahAudioUrl(qari, 97, 4)),
-                Ayah(5, "سَلَامٌ هِيَ حَتَّىٰ مَطْلَعِ الْفَجْرِ", "Peace it is until the emergence of dawn.", "Waa nabadgelyo ilaa waagu ka baryo.", "O gece, tanyeri ağarana kadar bir esenliktir.", "Elle est paix et salut jusqu'à l'apparition de l'aube.", getAyahAudioUrl(qari, 97, 5))
-            )
-            else -> emptyList()
-        }
-    }
 }

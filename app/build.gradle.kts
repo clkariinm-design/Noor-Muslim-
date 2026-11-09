@@ -70,8 +70,13 @@ android {
   }
 }
 
-tasks.withType<Test>().configureEach {
-  systemProperty("robolectric.dependency.dir", "/home/appuser/.m2/repository/org/robolectric/android-all-instrumented/16-robolectric-13921718-i7")
+// AI Studio may provide a preloaded Robolectric SDK directory. GitHub Actions and
+// ordinary local builds should let Robolectric resolve its SDK artifacts from Maven.
+val preloadedRobolectricSdk = file("/home/appuser/.m2/repository/org/robolectric/android-all-instrumented/16-robolectric-13921718-i7")
+if (preloadedRobolectricSdk.isDirectory) {
+  tasks.withType<Test>().configureEach {
+    systemProperty("robolectric.dependency.dir", preloadedRobolectricSdk.absolutePath)
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

@@ -1,6 +1,8 @@
 package com.example.ui.screens.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -74,6 +77,7 @@ fun SettingsScreen(
     var showQariDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
 
     var themeMode by remember { mutableStateOf(appPreferences.getThemeMode()) }
     var arabicFontSize by remember { mutableFloatStateOf(appPreferences.getArabicFontSize()) }
@@ -378,10 +382,55 @@ fun SettingsScreen(
             onDismissRequest = { showAboutDialog = false },
             title = { Text(strings.aboutApp, fontWeight = FontWeight.Bold) },
             text = {
-                Column {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(text = strings.aboutText, fontSize = 14.sp, lineHeight = 20.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(text = strings.developerNote, fontSize = 12.sp, color = IslamicGold, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Quran text (Uthmani, Version 1.1)\\nCopyright © 2007–2021 Tanzil Project\\nLicense: Creative Commons Attribution 3.0\\nThis carefully verified Quran text is reproduced verbatim and must not be changed.",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Source: https://tanzil.net",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://tanzil.net") }
+                    )
+                    Text(
+                        text = "Updates: https://tanzil.net/updates/",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://tanzil.net/updates/") }
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Translations (QuranEnc.com)\\nEnglish: Saheeh International / Noor International Center — Version 1.1.2\\nSomali: Abdullah Hasan Yaqoub — Version 1.0.27\\nTurkish: Rowwad Translation Center — Version 1.0.4\\nFrench: Rachid Maach — Version 1.0.3\\nTranslations are reproduced without modification. Publisher, source and version are retained.",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Translation source and terms: https://quranenc.com",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://quranenc.com/en/home/api") }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Audio recitations: Islamic Network / AlQuran Cloud CDN. Recitations remain copyrighted by their reciters or estates and may be withdrawn by rights holders.",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Audio source and terms: https://alquran.cloud/terms-and-conditions",
+                        fontSize = 11.sp,
+                        color = IslamicEmerald,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://alquran.cloud/terms-and-conditions") }
+                    )
                 }
             },
             confirmButton = {
