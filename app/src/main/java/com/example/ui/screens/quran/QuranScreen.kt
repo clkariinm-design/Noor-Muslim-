@@ -221,7 +221,7 @@ fun QuranScreen(
                                             color = Color.White
                                         )
                                         Text(
-                                            text = "Internet connection required to read",
+                                            text = "Offline reading is prepared automatically",
                                             fontSize = 11.sp,
                                             color = Color.White.copy(alpha = 0.78f)
                                         )
@@ -499,7 +499,7 @@ fun QuranScreen(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Tap on any Surah to download for offline listening.",
+                                            text = "Play a Surah to save its recitation for offline listening.",
                                             fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                             textAlign = TextAlign.Center
