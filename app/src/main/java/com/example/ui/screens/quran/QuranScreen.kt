@@ -129,7 +129,7 @@ fun QuranScreen(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Selected reciter", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(strings.reciter, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(selectedQari.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text(selectedQari.subName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
