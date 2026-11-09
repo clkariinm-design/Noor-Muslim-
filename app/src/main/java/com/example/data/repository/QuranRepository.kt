@@ -318,6 +318,31 @@ object QuranRepository {
         return result
     }
 
+    suspend fun getAvailableQarisFromBackend(): List<Qari> = withContext(Dispatchers.IO) {
+        val localById = AvailableQaris.associateBy { it.id }
+        val backendToLocalId = mapOf(
+            "mishary-alafasy" to "alafasy",
+            "abdul-basit" to "abdulbaset",
+            "abdurrahman-sudais" to "sudais",
+            "mahmoud-khalil-husary" to "husary",
+            "abu-bakr-ash-shatri" to "shatri",
+            "ali-al-hudhaify" to "hudhaify",
+            "maher-al-muaiqly" to "muaiqly",
+            "ar.minshawi" to "minshawi",
+            "ar.shuraim" to "shuraim",
+            "ar.muhammadayoub" to "muhammadayoub"
+        )
+        val rows = com.example.data.remote.SupabaseQuranApi.getReciters()
+        val result = mutableListOf<Qari>()
+        for (index in 0 until rows.length()) {
+            val slug = rows.getJSONObject(index).optString("slug")
+            val localId = backendToLocalId[slug] ?: continue
+            val qari = localById[localId] ?: continue
+            if (result.none { it.id == qari.id }) result.add(qari)
+        }
+        if (result.size == 10) result else AvailableQaris
+    }
+
     fun getAyahAudioUrl(qari: Qari, surahNumber: Int, ayahNumber: Int): String {
         val surah = allSurahs.firstOrNull { it.number == surahNumber }
             ?: throw IllegalArgumentException("Invalid surah number")
