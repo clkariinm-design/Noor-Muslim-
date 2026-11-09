@@ -49,13 +49,13 @@ data class Qari(
 )
 
 val AvailableQaris = listOf(
-    Qari("alafasy", "Mishary Rashid Alafasy", "مشاري بن راشد العفاسي", "Alafasy_128kbps", "128 kbps (High)", "Murattal"),
-    Qari("abdulbaset", "AbdulBaset AbdulSamad", "عبد الباسط عبد الصمد", "Abdul_Basit_Murattal_192kbps", "192 kbps (Studio)", "Murattal"),
-    Qari("ghamdi", "Saad Al-Ghamdi", "سعد الغامدي", "Ghamadi_40kbps", "40 kbps (Light)", "Murattal"),
-    Qari("husary", "Mahmoud Khalil Al-Husary", "محمود خليل الحصري", "Husary_128kbps", "128 kbps (Teacher)", "Murattal"),
-    Qari("shatri", "Abu Bakr Al-Shatri", "أبو بكر الشاطري", "Abu_Bakr_Ash-Shaatree_128kbps", "128 kbps (High)", "Murattal"),
-    Qari("hudhaify", "Ali Al-Hudhaify", "علي بن عبد الرحمن الحذيفي", "Hudhaify_128kbps", "128 kbps (High)", "Murattal"),
-    Qari("muaiqly", "Maher Al-Muaiqly", "ماهر المعيقلي", "MaherAlMuaiqly128kbps", "128 kbps (High)", "Murattal")
+    Qari("alafasy", "Mishary Rashid Alafasy", "مشاري بن راشد العفاسي", "ar.alafasy", "128 kbps (High)", "Murattal"),
+    Qari("abdulbaset", "AbdulBaset AbdulSamad", "عبد الباسط عبد الصمد", "ar.abdulsamad", "128 kbps", "Murattal"),
+    Qari("sudais", "Abdurrahmaan As-Sudais", "عبدالرحمن السديس", "ar.abdurrahmaansudais", "128 kbps", "Murattal"),
+    Qari("husary", "Mahmoud Khalil Al-Husary", "محمود خليل الحصري", "ar.husary", "128 kbps", "Murattal"),
+    Qari("shatri", "Abu Bakr Al-Shatri", "أبو بكر الشاطري", "ar.shaatree", "128 kbps", "Murattal"),
+    Qari("hudhaify", "Ali Al-Hudhaify", "علي بن عبد الرحمن الحذيفي", "ar.hudhaify", "128 kbps", "Murattal"),
+    Qari("muaiqly", "Maher Al-Muaiqly", "ماهر المعيقلي", "ar.mahermuaiqly", "128 kbps", "Murattal")
 )
 
 enum class DownloadState {
