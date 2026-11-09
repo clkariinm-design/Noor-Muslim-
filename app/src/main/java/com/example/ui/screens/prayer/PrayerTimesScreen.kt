@@ -3,9 +3,6 @@ package com.example.ui.screens.prayer
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,7 +33,6 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EditLocation
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
@@ -54,15 +50,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,12 +72,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.data.local.AppPreferences
-import com.example.data.service.AdhanPlaybackService
 import com.example.data.service.AdhanScheduler
 import com.example.data.location.GlobalLocationEngine
-import com.example.data.location.LocationData
 import com.example.data.location.LocationError
 import com.example.data.location.TimezoneCrossingEvent
 import com.example.data.model.CalculationMethod
@@ -500,80 +490,6 @@ fun PrayerTimesScreen(
             )
         }
 
-
-        // Adhan settings: five individual schedules and a test/stop control.
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Adhan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Full call to prayer at each selected prayer time. Fajr uses its own recording.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    listOf(
-                        PrayerType.FAJR to strings.fajr,
-                        PrayerType.DHUHR to strings.dhuhr,
-                        PrayerType.ASR to strings.asr,
-                        PrayerType.MAGHRIB to strings.maghrib,
-                        PrayerType.ISHA to strings.isha
-                    ).forEach { (prayer, label) ->
-                        var enabled by remember(prayer) { mutableStateOf(appPreferences.isAdhanEnabled(prayer)) }
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(label, fontWeight = FontWeight.Medium)
-                            Switch(
-                                checked = enabled,
-                                onCheckedChange = {
-                                    enabled = it
-                                    appPreferences.setAdhanEnabled(prayer, it)
-                                    AdhanScheduler.scheduleAll(context, currentCity)
-                                }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { AdhanPlaybackService.playTest(context, PrayerType.DHUHR) }) {
-                            Text("Test Adhan")
-                        }
-                        OutlinedButton(onClick = { AdhanPlaybackService.stop(context) }) {
-                            Text("Stop")
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-                        if (!alarmManager.canScheduleExactAlarms()) {
-                            TextButton(onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                                }
-                            }) { Text("Allow precise prayer alarms") }
-                        }
-                    }
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
-                        !notificationManager.isNotificationPolicyAccessGranted
-                    ) {
-                        TextButton(onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-                            }
-                        }) { Text("Allow Adhan during Do Not Disturb") }
-                    }
-                }
-            }
-        }
 
         // Calculation Settings Card
         item {

@@ -12,7 +12,7 @@ class AdhanAlarmReceiver : BroadcastReceiver() {
         val prayerName = intent?.getStringExtra(AdhanScheduler.EXTRA_PRAYER) ?: return
         val prayer = runCatching { PrayerType.valueOf(prayerName) }.getOrNull() ?: return
         val prefs = AppPreferences(context)
-        if (!prefs.isAdhanEnabled(prayer)) return
+        if (!prefs.isPrayerNotificationsEnabled() || !prefs.isAdhanEnabled(prayer)) return
 
         val serviceIntent = Intent(context, AdhanPlaybackService::class.java).apply {
             action = AdhanPlaybackService.ACTION_PLAY

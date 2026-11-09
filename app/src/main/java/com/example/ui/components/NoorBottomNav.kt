@@ -59,8 +59,16 @@ fun NoorBottomNav(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        NoorNavDestination.entries.forEach { destination ->
-            val isSelected = destination == currentDestination
+        listOf(
+            NoorNavDestination.HOME,
+            NoorNavDestination.QURAN,
+            NoorNavDestination.PRAYER,
+            NoorNavDestination.QIBLA,
+            NoorNavDestination.SETTINGS
+        ).forEach { destination ->
+            val isSelected = destination == currentDestination ||
+                (destination == NoorNavDestination.HOME &&
+                    currentDestination in setOf(NoorNavDestination.TASBEEH, NoorNavDestination.DUAS))
             val label = when (destination) {
                 NoorNavDestination.HOME -> strings.navHome
                 NoorNavDestination.QURAN -> strings.navQuran

@@ -26,7 +26,9 @@ object AdhanScheduler {
     fun scheduleAll(context: Context, city: CityLocation? = null) {
         val app = context.applicationContext
         val prefs = AppPreferences(app)
-        AdhanPlaybackService.prefetchAll(app)
+        if (prefs.isPrayerNotificationsEnabled() && prefs.areAdhansEnabled()) {
+            AdhanPlaybackService.prefetchAll(app)
+        }
         val location = city ?: prefs.getSelectedCity()
         val alarmManager = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val zone = TimeZone.getTimeZone(location.timeZoneId)
@@ -35,7 +37,7 @@ object AdhanScheduler {
         prayers.forEach { prayer ->
             val requestCode = requestCode(prayer)
             val pending = pendingIntent(app, prayer, requestCode)
-            if (!prefs.isAdhanEnabled(prayer)) {
+            if (!prefs.isPrayerNotificationsEnabled() || !prefs.isAdhanEnabled(prayer)) {
                 alarmManager.cancel(pending)
                 return@forEach
             }

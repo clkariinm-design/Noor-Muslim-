@@ -10,6 +10,8 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -39,27 +41,34 @@ class AdhanPlaybackService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createChannel()
-        player = ExoPlayer.Builder(this)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
-                    .setUsage(C.USAGE_ALARM)
-                    .build(),
-                true
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .build().also { exo ->
-                exo.volume = 0.72f
-                exo.addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(state: Int) {
-                        if (state == Player.STATE_ENDED) finishAdhan()
-                    }
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        finishAdhan()
-                    }
-                })
-            }
+        try {
+            createChannel()
+            player = ExoPlayer.Builder(this)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                        .setUsage(C.USAGE_ALARM)
+                        .build(),
+                    true
+                )
+                .setHandleAudioBecomingNoisy(true)
+                .build().also { exo ->
+                    exo.volume = 0.72f
+                    exo.addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(state: Int) {
+                            if (state == Player.STATE_ENDED) finishAdhan()
+                        }
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                            Log.e(TAG, "Adhan audio playback failed", error)
+                            finishAdhan()
+                        }
+                    })
+                }
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to initialize Adhan playback", error)
+            player?.release()
+            player = null
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,12 +81,20 @@ class AdhanPlaybackService : Service() {
             ACTION_PLAY, ACTION_TEST -> {
                 val name = intent.getStringExtra(AdhanScheduler.EXTRA_PRAYER) ?: PrayerType.DHUHR.name
                 val prayer = runCatching { PrayerType.valueOf(name) }.getOrDefault(PrayerType.DHUHR)
-                startForeground(NOTIFICATION_ID, buildNotification(prayer))
-                if (AudioPlayerManager.playbackState.value == PlaybackState.PLAYING) {
-                    resumeQuranAfterAdhan = true
-                    AudioPlayerManager.pause()
+                try {
+                    startForeground(NOTIFICATION_ID, buildNotification(prayer))
+                    if (player == null) {
+                        throw IllegalStateException("The audio player could not be initialized")
+                    }
+                    if (AudioPlayerManager.playbackState.value == PlaybackState.PLAYING) {
+                        resumeQuranAfterAdhan = true
+                        AudioPlayerManager.pause()
+                    }
+                    play(prayer)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Unable to start Adhan for ${prayer.name}", error)
+                    finishAdhan()
                 }
-                play(prayer)
             }
         }
         return START_NOT_STICKY
@@ -88,7 +105,12 @@ class AdhanPlaybackService : Service() {
         val file = File(filesDir, "adhan/${prayer.name.lowercase()}.mp3")
         file.parentFile?.mkdirs()
         val source = if (file.exists() && file.length() > 20_000L) Uri.fromFile(file) else Uri.parse(url)
-        player?.apply {
+        val activePlayer = player ?: run {
+            Log.e(TAG, "Adhan player is unavailable")
+            finishAdhan()
+            return
+        }
+        activePlayer.apply {
             stop()
             setMediaItem(MediaItem.fromUri(source))
             prepare()
@@ -102,7 +124,8 @@ class AdhanPlaybackService : Service() {
             resumeQuranAfterAdhan = false
             AudioPlayerManager.resume()
         }
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
+            .onFailure { Log.w(TAG, "Could not remove Adhan foreground notification", it) }
         stopSelf()
     }
 
@@ -156,6 +179,7 @@ class AdhanPlaybackService : Service() {
         const val ACTION_STOP = "com.example.noormuslim.ADHAN_STOP"
         private const val CHANNEL_ID = "noor_adhan_audio"
         private const val NOTIFICATION_ID = 7101
+        private const val TAG = "AdhanPlayback"
 
         // Internet Archive item is marked Public Domain Mark 1.0. Separate Fajr
         // recording includes the Fajr-specific phrase. Files are cached on device.
@@ -201,7 +225,16 @@ class AdhanPlaybackService : Service() {
                 action = ACTION_TEST
                 putExtra(AdhanScheduler.EXTRA_PRAYER, prayer.name)
             }
-            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            try {
+                androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            } catch (error: Exception) {
+                Log.e(TAG, "Android refused to start Adhan playback service", error)
+                Toast.makeText(
+                    context.applicationContext,
+                    "Adhan could not start. Check app permissions and try again.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
 
         fun stop(context: android.content.Context) {

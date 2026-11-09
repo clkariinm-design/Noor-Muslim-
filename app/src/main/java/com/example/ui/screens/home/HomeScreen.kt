@@ -1,6 +1,5 @@
 package com.example.ui.screens.home
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,16 +22,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -43,7 +39,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,7 +58,6 @@ import com.example.R
 import com.example.data.model.AppLanguage
 import com.example.data.model.CityLocation
 import com.example.data.model.LocalizedStrings
-import com.example.data.model.PrayerTimeItem
 import com.example.data.model.PrayerType
 import com.example.data.repository.AudioPlayerManager
 import com.example.data.repository.CurrentPlayingTrack
@@ -396,7 +390,7 @@ fun HomeScreen(
             }
         }
 
-        // 4. QUICK ACCESS GRID (Quran, Qibla, Tasbeeh, Duas)
+        // Quick access for useful secondary tools. Quran and Qibla already have primary navigation tabs.
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
@@ -404,31 +398,6 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickAccessTile(
-                        icon = Icons.AutoMirrored.Filled.MenuBook,
-                        title = strings.navQuran,
-                        color = IslamicEmerald,
-                        modifier = Modifier.weight(1f),
-                        testTag = "quick_quran",
-                        onClick = { onNavigate(NoorNavDestination.QURAN) }
-                    )
-                    QuickAccessTile(
-                        icon = Icons.Filled.Explore,
-                        title = strings.navQibla,
-                        color = Color(0xFFC27803),
-                        modifier = Modifier.weight(1f),
-                        testTag = "quick_qibla",
-                        onClick = { onNavigate(NoorNavDestination.QIBLA) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -436,7 +405,7 @@ fun HomeScreen(
                     QuickAccessTile(
                         icon = Icons.Filled.TouchApp,
                         title = strings.navTasbeeh,
-                        color = Color(0xFF1B6B93),
+                        color = IslamicEmerald,
                         modifier = Modifier.weight(1f),
                         testTag = "quick_tasbeeh",
                         onClick = { onNavigate(NoorNavDestination.TASBEEH) }
@@ -444,7 +413,7 @@ fun HomeScreen(
                     QuickAccessTile(
                         icon = Icons.Filled.AutoAwesome,
                         title = strings.navDuas,
-                        color = Color(0xFF5D3891),
+                        color = IslamicGold,
                         modifier = Modifier.weight(1f),
                         testTag = "quick_duas",
                         onClick = { onNavigate(NoorNavDestination.DUAS) }

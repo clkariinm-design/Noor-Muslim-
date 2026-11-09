@@ -1,5 +1,10 @@
 package com.example.ui.screens.settings
 
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -39,6 +45,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,16 +55,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.AppPreferences
+import com.example.data.service.AdhanPlaybackService
 import com.example.data.model.AppLanguage
 import com.example.data.model.AvailableQaris
-import com.example.data.model.CalculationMethod
-import com.example.data.model.JuristicMethod
 import com.example.data.model.LocalizedStrings
 import com.example.data.model.Qari
+import com.example.data.model.PrayerType
 import com.example.ui.components.IslamicOrnamentCard
 import com.example.ui.screens.quran.ReciterSelectionDialog
 import com.example.ui.theme.AmiriFontFamily
@@ -70,7 +80,8 @@ fun SettingsScreen(
     currentLanguage: AppLanguage,
     appPreferences: AppPreferences,
     onLanguageChange: (AppLanguage) -> Unit,
-    onThemeChange: (String) -> Unit
+    onThemeChange: (String) -> Unit,
+    onAdhanSettingsChanged: () -> Unit
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -83,6 +94,25 @@ fun SettingsScreen(
     var arabicFontSize by remember { mutableFloatStateOf(appPreferences.getArabicFontSize()) }
     var translationFontSize by remember { mutableFloatStateOf(appPreferences.getTranslationFontSize()) }
     var prayerNotifs by remember { mutableStateOf(appPreferences.isPrayerNotificationsEnabled()) }
+    val systemContext = androidx.compose.ui.platform.LocalContext.current
+    val alarmManager = remember {
+        systemContext.getSystemService(android.content.Context.ALARM_SERVICE) as AlarmManager
+    }
+    var exactAlarmAccess by remember {
+        mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms())
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, alarmManager) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                exactAlarmAccess = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                    alarmManager.canScheduleExactAlarms()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val needsExactAlarmAccess = !exactAlarmAccess
 
     var selectedQariId by remember { mutableStateOf(appPreferences.getSelectedQariId()) }
     val currentQari = AvailableQaris.firstOrNull { it.id == selectedQariId } ?: AvailableQaris[0]
@@ -140,43 +170,112 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(16.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = null,
-                            tint = IslamicEmerald,
-                            modifier = Modifier.padding(end = 12.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = IslamicEmerald,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = strings.prayerReminders,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                                Text(
+                                    text = if (prayerNotifs) strings.notificationsEnabled else strings.notificationsDisabled,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = prayerNotifs,
+                            onCheckedChange = {
+                                prayerNotifs = it
+                                appPreferences.setPrayerNotificationsEnabled(it)
+                                onAdhanSettingsChanged()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = IslamicGold,
+                                checkedTrackColor = IslamicEmerald
+                            )
                         )
-                        Column {
-                            Text(
-                                text = strings.prayerReminders,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                            )
-                            Text(
-                                text = if (prayerNotifs) strings.notificationsEnabled else strings.notificationsDisabled,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    }
+                    if (prayerNotifs) {
+                        if (needsExactAlarmAccess) {
+                            TextButton(
+                                onClick = {
+                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                        data = Uri.parse("package:${systemContext.packageName}")
+                                    }
+                                    runCatching { systemContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Allow precise prayer-time alerts")
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        listOf(
+                            PrayerType.FAJR,
+                            PrayerType.DHUHR,
+                            PrayerType.ASR,
+                            PrayerType.MAGHRIB,
+                            PrayerType.ISHA
+                        ).forEach { prayer ->
+                            var enabled by remember(prayer) {
+                                mutableStateOf(appPreferences.isAdhanEnabled(prayer))
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = prayer.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Switch(
+                                    checked = enabled,
+                                    onCheckedChange = {
+                                        enabled = it
+                                        appPreferences.setAdhanEnabled(prayer, it)
+                                        onAdhanSettingsChanged()
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { AdhanPlaybackService.playTest(systemContext, PrayerType.DHUHR) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Test Adhan")
+                            }
+                            OutlinedButton(
+                                onClick = { AdhanPlaybackService.stop(systemContext) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Stop")
+                            }
                         }
                     }
-                    Switch(
-                        checked = prayerNotifs,
-                        onCheckedChange = {
-                            prayerNotifs = it
-                            appPreferences.setPrayerNotificationsEnabled(it)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = IslamicGold,
-                            checkedTrackColor = IslamicEmerald
-                        )
-                    )
                 }
             }
         }
