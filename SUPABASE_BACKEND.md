@@ -1,0 +1,31 @@
+# Noor Muslim — Supabase backend
+
+Project: `noor-muslim`  
+Project ref: `lwfzvhkixpneajkfmwgd`  
+Region: `eu-central-1` (Frankfurt)
+
+## Android configuration
+
+The project already applies Google's Secrets Gradle Plugin and reads `.env`, with `.env.example` as its build fallback. Supabase URL and the **publishable** key are configured there. Never place a service-role or secret key in GitHub or an APK.
+
+The Android read-only API wrapper is `SupabaseQuranApi`. It uses the existing OkHttp dependency and calls the Supabase REST Data API. It exposes read operations for surah metadata, reciters, translation editions, ayah translations, and audio metadata.
+
+## Database
+
+The live database has five tables: `quran_surahs` (114 surahs), `quran_reciters` (10 catalogue entries), `quran_translations` (English/Somali/Turkish/French edition placeholders), `quran_ayah_translations` (licensed text keyed by edition/surah/ayah), and `quran_audio_assets` (per-ayah or per-surah audio metadata).
+
+All five tables have RLS enabled. Anonymous and authenticated clients can only read active catalogue rows. No public write policy exists. The Supabase Security Advisor returned no findings after initial schema setup.
+
+## Content status
+
+Translation editions currently contain metadata placeholders only; the ayah translation table is empty. Do not present these as populated translations until a source and redistribution licence are verified and the actual text is imported.
+
+No audio files have been uploaded to this project yet. The app's existing EveryAyah playback URLs remain the current playback path. Populate `quran_audio_assets` only after verifying that the recording source permits redistribution/hosting.
+
+## Next integration stages
+
+1. Connect the reader/repository to this read-only API with offline-first fallback.
+2. Add verified licensed translation datasets and import them.
+3. Add audio provider metadata and test every reciter's actual file paths.
+4. Configure object storage/CDN for authorized MP3s.
+5. Test streaming, interrupted downloads, offline playback, and app startup on Android.
