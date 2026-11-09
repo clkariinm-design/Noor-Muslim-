@@ -171,7 +171,8 @@ fun NoorMuslimApp() {
                                 currentLanguage = currentLanguage,
                                 appPreferences = appPreferences,
                                 onLanguageChange = { appPreferences.setLanguage(it) },
-                                onThemeChange = { appPreferences.setThemeMode(it) }
+                                onThemeChange = { appPreferences.setThemeMode(it) },
+                                currentCity = currentCity
                             )
                         }
                     }
