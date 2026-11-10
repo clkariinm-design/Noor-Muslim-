@@ -262,7 +262,7 @@ private fun SignedInScreen(
     }
 }
 
-private fun validateCredentials(email: String, password: String, registering: Boolean): String? {
+internal fun validateCredentials(email: String, password: String, registering: Boolean): String? {
     val emailDomain = email.substringAfterLast("@", "")
     if (!email.contains("@") || !emailDomain.contains(".")) {
         return "Enter a valid email address."
