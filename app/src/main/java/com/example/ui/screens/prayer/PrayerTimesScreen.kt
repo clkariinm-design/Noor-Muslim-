@@ -84,6 +84,7 @@ import androidx.core.content.ContextCompat
 import com.example.data.local.AppPreferences
 import com.example.data.service.AdhanPlaybackService
 import com.example.data.service.AdhanScheduler
+import com.example.data.service.PrayerPermissionPolicy
 import com.example.data.location.GlobalLocationEngine
 import com.example.data.location.LocationData
 import com.example.data.location.LocationError
