@@ -58,3 +58,20 @@ def test_authentication_uses_email_password_without_google_oauth():
     assert "/api/v1/auth/logout" in paths
     assert "/api/v1/auth/me" in paths
     assert "/api/v1/auth/google" not in paths
+
+
+def test_auth_endpoints_fail_closed_when_initial_database_migration_is_missing(monkeypatch):
+    import auth
+    from sqlalchemy import create_engine
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    monkeypatch.setattr(auth, "configured_engine", lambda: engine)
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reader@example.com", "password": "a-long-password"},
+    )
+    engine.dispose()
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "database_schema_not_ready"
