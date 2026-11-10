@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str | None = None
     auth_jwt_secret: str | None = None
-    google_client_id: str | None = None
     cors_origins_raw: str = Field(
         default="",
         validation_alias=AliasChoices("CORS_ORIGINS", "CORS_ORIGINS_RAW"),
