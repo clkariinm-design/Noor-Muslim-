@@ -1,6 +1,7 @@
 package com.example.ui.screens.prayer
 
 import android.Manifest
+import android.os.Build
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -127,6 +128,7 @@ fun PrayerTimesScreen(
     var calculationMethod by remember { mutableStateOf(appPreferences.getCalculationMethod()) }
     var juristicMethod by remember { mutableStateOf(appPreferences.getJuristicMethod()) }
     var notificationsEnabled by remember { mutableStateOf(appPreferences.isPrayerNotificationsEnabled()) }
+    var allAdhanEnabled by remember { mutableStateOf(appPreferences.isPrayerNotificationsEnabled()) }
 
     // Live clock ticker in geographical timezone
     LaunchedEffect(currentCity, calculationMethod, juristicMethod) {
@@ -174,6 +176,36 @@ fun PrayerTimesScreen(
                     }
                 }
             )
+        }
+    }
+
+    // Android 13+ requires a runtime notification permission. Ask only when the user enables prayer alerts.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificationsEnabled = granted
+        allAdhanEnabled = granted
+        appPreferences.setPrayerNotificationsEnabled(granted)
+        AdhanScheduler.scheduleAll(context, currentCity)
+        if (!granted) {
+            Toast.makeText(
+                context,
+                "Notification permission is off. Enable it in Android Settings to receive prayer alerts.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    val setPrayerAlertsEnabled: (Boolean) -> Unit = { enabled ->
+        val permissionGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (enabled && PrayerPermissionPolicy.shouldRequestPostNotifications(Build.VERSION.SDK_INT, permissionGranted)) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            notificationsEnabled = enabled
+            allAdhanEnabled = enabled
+            appPreferences.setPrayerNotificationsEnabled(enabled)
+            AdhanScheduler.scheduleAll(context, currentCity)
         }
     }
 
@@ -465,9 +497,7 @@ fun PrayerTimesScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = {
-                            notificationsEnabled = !notificationsEnabled
-                            appPreferences.setPrayerNotificationsEnabled(notificationsEnabled)
-                            AdhanScheduler.scheduleAll(context, currentCity)
+                            setPrayerAlertsEnabled(!notificationsEnabled)
                         }
                     ) {
                         Icon(
@@ -504,9 +534,6 @@ fun PrayerTimesScreen(
 
         // New Adhan control panel: master switch, per-prayer switches and safe test playback.
         item {
-            var allAdhanEnabled by remember {
-                mutableStateOf(appPreferences.isPrayerNotificationsEnabled())
-            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -538,11 +565,7 @@ fun PrayerTimesScreen(
                         }
                         Switch(
                             checked = allAdhanEnabled,
-                            onCheckedChange = {
-                                allAdhanEnabled = it
-                                appPreferences.setPrayerNotificationsEnabled(it)
-                                AdhanScheduler.scheduleAll(context, currentCity)
-                            }
+                            onCheckedChange = { setPrayerAlertsEnabled(it) }
                         )
                     }
 
