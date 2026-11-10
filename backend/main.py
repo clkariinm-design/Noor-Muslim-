@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
+from auth import router as auth_router
 from config import get_settings
 from database import configured_engine, database_is_ready
 
@@ -16,7 +17,7 @@ settings = get_settings()
 app = FastAPI(
     title="Noor Muslim API",
     description="Versioned backend API for the Noor Muslim application.",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url=None,
     openapi_url="/openapi.json" if settings.environment != "production" else None,
@@ -37,9 +38,7 @@ async def apply_security_headers(request: Request, call_next) -> Response:
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = (
-        "camera=(), microphone=(), geolocation=()"
-    )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cross-Origin-Resource-Policy"] = "same-site"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = (
@@ -55,6 +54,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+
+app.include_router(auth_router)
 
 
 @app.get("/health", tags=["operations"])
