@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   assemble-debug:
-    name: Assemble empty Android app
+    name: Build and test Noor Muslim Android app
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,13 +47,13 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US" \
             -keyalg RSA -keysize 2048 -validity 10000
 
-      - name: Build debug APK
-        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Run unit tests and build debug APK
+        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: noor-muslim-empty-debug-apk
+          name: noor-muslim-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
