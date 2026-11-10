@@ -12,6 +12,12 @@ import com.example.ui.NoorMuslimApp
 import com.example.update.MandatoryUpdateGate
 
 class MainActivity : ComponentActivity() {
+    override fun onResume() {
+        super.onResume()
+        // Rebuild alarms after returning from Android notification or exact-alarm settings.
+        AdhanScheduler.scheduleAll(applicationContext)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AudioPlayerManager.initialize(applicationContext)
