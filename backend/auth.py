@@ -72,6 +72,35 @@ def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def require_auth_schema() -> None:
+    """Fail closed until the initial PostgreSQL migration is recorded."""
+    engine = None
+    try:
+        engine = configured_engine()
+        with engine.connect() as connection:
+            applied = connection.execute(
+                text(
+                    "SELECT version FROM schema_migrations "
+                    "WHERE version = :version"
+                ),
+                {"version": "001_initial_schema"},
+            ).scalar_one_or_none()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="database_schema_not_ready",
+        ) from exc
+    finally:
+        if engine is not None:
+            engine.dispose()
+
+    if applied is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="database_schema_not_ready",
+        )
+
+
 def _jwt_secret() -> str:
     secret = get_settings().auth_jwt_secret
     if not secret or len(secret) < 32:
@@ -135,7 +164,10 @@ def _bearer_user(
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(payload: RegisterInput) -> TokenResponse:
+def register(
+    payload: RegisterInput,
+    _: None = Depends(require_auth_schema),
+) -> TokenResponse:
     email = normalize_email(payload.email)
     password_hash = hash_password(payload.password)
     try:
@@ -156,7 +188,10 @@ def register(payload: RegisterInput) -> TokenResponse:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginInput) -> TokenResponse:
+def login(
+    payload: LoginInput,
+    _: None = Depends(require_auth_schema),
+) -> TokenResponse:
     email = normalize_email(payload.email)
     with configured_engine().begin() as connection:
         user = connection.execute(
@@ -171,7 +206,10 @@ def login(payload: LoginInput) -> TokenResponse:
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh(payload: RefreshInput) -> TokenResponse:
+def refresh(
+    payload: RefreshInput,
+    _: None = Depends(require_auth_schema),
+) -> TokenResponse:
     token_hash = hash_refresh_token(payload.refresh_token)
     now = datetime.now(timezone.utc)
     with configured_engine().begin() as connection:
@@ -196,7 +234,10 @@ def refresh(payload: RefreshInput) -> TokenResponse:
 
 
 @router.post("/logout")
-def logout(payload: RefreshInput) -> dict[str, bool]:
+def logout(
+    payload: RefreshInput,
+    _: None = Depends(require_auth_schema),
+) -> dict[str, bool]:
     with configured_engine().begin() as connection:
         connection.execute(
             text(
@@ -211,7 +252,10 @@ def logout(payload: RefreshInput) -> dict[str, bool]:
 
 
 @router.get("/me")
-def me(user_id: Annotated[str, Depends(_bearer_user)]) -> dict[str, str | bool]:
+def me(
+    user_id: Annotated[str, Depends(_bearer_user)],
+    _: None = Depends(require_auth_schema),
+) -> dict[str, str | bool]:
     with configured_engine().connect() as connection:
         user = connection.execute(
             text(
