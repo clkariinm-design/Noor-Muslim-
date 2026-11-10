@@ -3,8 +3,11 @@
 The backend starts as a modular monolith: one deployable FastAPI service with
 versioned domain modules and PostgreSQL as the source of truth.
 """
-from fastapi import FastAPI, HTTPException
+from uuid import UUID, uuid4
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 from config import get_settings
 from database import configured_engine, database_is_ready
@@ -18,6 +21,33 @@ app = FastAPI(
     redoc_url=None,
     openapi_url="/openapi.json" if settings.environment != "production" else None,
 )
+
+
+@app.middleware("http")
+async def apply_security_headers(request: Request, call_next) -> Response:
+    """Attach a conservative baseline of security headers to every response."""
+    supplied_request_id = request.headers.get("X-Request-ID", "")
+    try:
+        request_id = str(UUID(supplied_request_id))
+    except (ValueError, TypeError, AttributeError):
+        request_id = str(uuid4())
+
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=()"
+    )
+    response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
