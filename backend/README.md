@@ -20,6 +20,18 @@ pytest
 - Readiness check: `/health/ready`
 - Required production variable: `DATABASE_URL` (Railway Postgres reference)
 - Set `ENVIRONMENT=production` and set `CORS_ORIGINS` only to trusted origins.
+- Set `AUTH_JWT_SECRET` to a unique random value of at least 32 characters.
+- Authentication uses email and password; Google OAuth credentials are not required.
+
+## Authentication
+
+- `POST /api/v1/auth/register` creates an account with email and password.
+- `POST /api/v1/auth/login` signs in with email and password.
+- `POST /api/v1/auth/refresh` rotates the refresh token.
+- `POST /api/v1/auth/logout` revokes the refresh token.
+- `GET /api/v1/auth/me` returns the authenticated account profile.
+
+Google Sign-In is intentionally not enabled. Account email verification and password-reset email delivery require a mail provider and are not yet configured.
 
 ## Database
 
