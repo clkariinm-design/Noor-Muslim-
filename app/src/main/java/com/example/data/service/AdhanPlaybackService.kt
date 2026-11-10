@@ -33,6 +33,9 @@ import java.util.concurrent.Executors
 class AdhanPlaybackService : Service() {
     private var player: ExoPlayer? = null
     private var resumeQuranAfterAdhan = false
+    private var activePrayer: PrayerType = PrayerType.DHUHR
+    private var activeCacheFile: File? = null
+    private var playingFromCache = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -88,12 +91,29 @@ class AdhanPlaybackService : Service() {
                 exo.volume = 1.0f
                 exo.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
+                        Log.d(TAG, "Playback state=$state prayer=$activePrayer cached=$playingFromCache")
                         if (state == Player.STATE_ENDED) finishAdhan()
                     }
 
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        Log.d(TAG, "isPlaying=$isPlaying prayer=$activePrayer cached=$playingFromCache")
+                    }
+
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        Log.e(TAG, "Adhan audio playback failed", error)
-                        finishAdhan()
+                        Log.e(
+                            TAG,
+                            "Adhan playback error prayer=$activePrayer cached=$playingFromCache code=${error.errorCodeName}",
+                            error
+                        )
+                        val cachedFile = activeCacheFile
+                        if (playingFromCache && cachedFile != null) {
+                            // A stale or damaged cache must never silence Adhan permanently.
+                            cachedFile.delete()
+                            playingFromCache = false
+                            retryFromServer(activePrayer)
+                        } else {
+                            finishAdhan()
+                        }
                     }
                 })
                 player = exo
@@ -101,14 +121,14 @@ class AdhanPlaybackService : Service() {
     }
 
     private fun play(prayer: PrayerType) {
-        val url = AUDIO_URLS[prayer] ?: AUDIO_URLS.getValue(PrayerType.DHUHR)
         val file = File(filesDir, "adhan/${prayer.name.lowercase()}.mp3")
         file.parentFile?.mkdirs()
-        val source = if (file.exists() && file.length() > MIN_AUDIO_BYTES) {
-            Uri.fromFile(file)
-        } else {
-            Uri.parse(url)
-        }
+        activePrayer = prayer
+        activeCacheFile = file
+        playingFromCache = file.exists() && file.length() > MIN_AUDIO_BYTES
+
+        val source = if (playingFromCache) Uri.fromFile(file) else Uri.parse(audioUrl(prayer))
+        Log.i(TAG, "Starting Adhan prayer=$prayer source=${if (playingFromCache) "cache" else "server"}")
 
         getOrCreatePlayer().apply {
             stop()
@@ -117,7 +137,20 @@ class AdhanPlaybackService : Service() {
             playWhenReady = true
         }
 
-        if (!file.exists() || file.length() <= MIN_AUDIO_BYTES) prefetchPrayer(applicationContext, prayer)
+        if (!playingFromCache) prefetchPrayer(applicationContext, prayer)
+    }
+
+    private fun retryFromServer(prayer: PrayerType) {
+        Log.w(TAG, "Retrying Adhan from server after cached audio failed: $prayer")
+        activePrayer = prayer
+        playingFromCache = false
+        getOrCreatePlayer().apply {
+            stop()
+            clearMediaItems()
+            setMediaItem(MediaItem.fromUri(audioUrl(prayer)))
+            prepare()
+            playWhenReady = true
+        }
     }
 
     private fun finishAdhan() {
@@ -195,14 +228,19 @@ class AdhanPlaybackService : Service() {
         private const val NOTIFICATION_ID = 7101
         private const val MIN_AUDIO_BYTES = 20_000L
 
-        // Public-domain recordings; Fajr has its own Fajr Adhan.
-        private val AUDIO_URLS = mapOf(
-            PrayerType.FAJR to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_01_Fajr_Adhan.mp3",
-            PrayerType.DHUHR to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_02_Dhuhr_Adhan.mp3",
-            PrayerType.ASR to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_03_Asr_Adhan.mp3",
-            PrayerType.MAGHRIB to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_04_Maghrib_Adhan.mp3",
-            PrayerType.ISHA to "https://archive.org/download/adhan.recordings.from.doha.qatar/Adhan_Doha_Qatar_05_Isha_Adhan.mp3"
-        )
+        private const val ADHAN_SERVER = "https://lwfzvhkixpneajkfmwgd.supabase.co/functions/v1/adhan-audio"
+
+        private fun audioUrl(prayer: PrayerType): String {
+            val name = when (prayer) {
+                PrayerType.FAJR -> "fajr"
+                PrayerType.DHUHR -> "dhuhr"
+                PrayerType.ASR -> "asr"
+                PrayerType.MAGHRIB -> "maghrib"
+                PrayerType.ISHA -> "isha"
+                PrayerType.SUNRISE -> "dhuhr"
+            }
+            return "$ADHAN_SERVER?prayer=$name"
+        }
 
         private val cacheExecutor = Executors.newSingleThreadExecutor()
 
@@ -213,7 +251,8 @@ class AdhanPlaybackService : Service() {
         }
 
         private fun prefetchPrayer(context: android.content.Context, prayer: PrayerType) {
-            val source = AUDIO_URLS[prayer] ?: return
+            if (prayer == PrayerType.SUNRISE) return
+            val source = audioUrl(prayer)
             val target = File(context.filesDir, "adhan/${prayer.name.lowercase()}.mp3")
             if (target.exists() && target.length() > MIN_AUDIO_BYTES) return
             cacheExecutor.execute {
