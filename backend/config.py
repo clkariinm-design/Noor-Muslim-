@@ -30,11 +30,14 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        return [
+        origins = [
             origin.strip().rstrip("/")
             for origin in self.cors_origins_raw.split(",")
             if origin.strip()
         ]
+        if self.environment == "production" and "*" in origins:
+            raise ValueError("Wildcard CORS origins are not allowed in production")
+        return origins
 
     @property
     def sqlalchemy_database_url(self) -> str | None:
