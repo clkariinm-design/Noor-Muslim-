@@ -47,3 +47,14 @@ def test_readiness_endpoint_succeeds_when_database_query_succeeds(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["database"] == "ready"
+
+
+def test_authentication_uses_email_password_without_google_oauth():
+    paths = {route.path for route in app.routes}
+
+    assert "/api/v1/auth/register" in paths
+    assert "/api/v1/auth/login" in paths
+    assert "/api/v1/auth/refresh" in paths
+    assert "/api/v1/auth/logout" in paths
+    assert "/api/v1/auth/me" in paths
+    assert "/api/v1/auth/google" not in paths
