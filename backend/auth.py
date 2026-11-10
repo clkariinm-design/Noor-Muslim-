@@ -1,7 +1,7 @@
 """Authentication endpoints for Noor Muslim API.
 
-Email/password and Google ID-token sign-in. Refresh tokens are opaque and
-stored only as SHA-256 hashes; access tokens are short-lived JWTs.
+Email/password sign-in. Refresh tokens are opaque and stored only as
+SHA-256 hashes; access tokens are short-lived JWTs.
 """
 from __future__ import annotations
 
@@ -13,8 +13,6 @@ from typing import Annotated
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
 from jwt import InvalidTokenError
 from pydantic import BaseModel, Field
 from pwdlib import PasswordHash
@@ -39,10 +37,6 @@ class RegisterInput(BaseModel):
 class LoginInput(BaseModel):
     email: str = Field(min_length=5, max_length=320)
     password: str = Field(min_length=1, max_length=128)
-
-
-class GoogleInput(BaseModel):
-    id_token: str = Field(min_length=20, max_length=8192)
 
 
 class RefreshInput(BaseModel):
@@ -173,50 +167,6 @@ def login(payload: LoginInput) -> TokenResponse:
             payload.password, user["password_hash"]
         ):
             raise HTTPException(status_code=401, detail="invalid_email_or_password")
-        return _issue_session(connection, str(user["id"]))
-
-
-@router.post("/google", response_model=TokenResponse)
-def google_sign_in(payload: GoogleInput) -> TokenResponse:
-    client_id = get_settings().google_client_id
-    if not client_id:
-        raise HTTPException(
-            status_code=503,
-            detail="google_sign_in_not_configured",
-        )
-    try:
-        claims = id_token.verify_oauth2_token(
-            payload.id_token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail="invalid_google_id_token") from exc
-
-    email = claims.get("email")
-    subject = claims.get("sub")
-    if not email or not subject or claims.get("email_verified") is not True:
-        raise HTTPException(status_code=401, detail="google_email_not_verified")
-
-    normalized_email = normalize_email(email)
-    with configured_engine().begin() as connection:
-        user = connection.execute(
-            text(
-                """
-                INSERT INTO users (email, google_subject, email_verified)
-                VALUES (:email, :subject, TRUE)
-                ON CONFLICT (email) DO UPDATE
-                    SET google_subject = COALESCE(users.google_subject, EXCLUDED.google_subject),
-                        email_verified = TRUE,
-                        updated_at = NOW()
-                WHERE users.google_subject IS NULL OR users.google_subject = EXCLUDED.google_subject
-                RETURNING id
-                """
-            ),
-            {"email": normalized_email, "subject": subject},
-        ).mappings().first()
-        if user is None:
-            raise HTTPException(status_code=409, detail="google_account_conflict")
         return _issue_session(connection, str(user["id"]))
 
 
