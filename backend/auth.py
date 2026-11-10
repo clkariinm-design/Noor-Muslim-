@@ -245,8 +245,8 @@ def refresh(payload: RefreshInput) -> TokenResponse:
         return _issue_session(connection, str(session["user_id"]))
 
 
-@router.post("/logout", status_code=204)
-def logout(payload: RefreshInput) -> None:
+@router.post("/logout")
+def logout(payload: RefreshInput) -> dict[str, bool]:
     with configured_engine().begin() as connection:
         connection.execute(
             text(
@@ -257,7 +257,7 @@ def logout(payload: RefreshInput) -> None:
             ),
             {"token_hash": hash_refresh_token(payload.refresh_token)},
         )
-    return None
+    return {"ok": True}
 
 
 @router.get("/me")
