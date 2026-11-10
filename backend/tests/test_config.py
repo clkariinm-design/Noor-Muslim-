@@ -26,3 +26,10 @@ def test_cors_origins_load_from_railway_cors_origins_variable(monkeypatch):
     settings = Settings(_env_file=None)
 
     assert settings.cors_origins == ["https://noor.example"]
+
+
+def test_production_rejects_wildcard_cors_origins():
+    settings = Settings(environment="production", cors_origins_raw="*")
+
+    with pytest.raises(ValueError, match="Wildcard CORS origins are not allowed in production"):
+        _ = settings.cors_origins
