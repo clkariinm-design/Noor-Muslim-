@@ -30,6 +30,9 @@ pytest
 - `POST /api/v1/auth/refresh` rotates the refresh token.
 - `POST /api/v1/auth/logout` revokes the refresh token.
 - `GET /api/v1/auth/me` returns the authenticated account profile.
+- Auth endpoints return `503 database_schema_not_ready` until migration
+  `001_initial_schema` is recorded in PostgreSQL; they do not attempt schema
+  changes automatically.
 
 Google Sign-In is intentionally not enabled. Account email verification and password-reset email delivery require a mail provider and are not yet configured.
 

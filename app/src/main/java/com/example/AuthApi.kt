@@ -112,7 +112,7 @@ object AuthApi {
         "email_already_registered" -> "This email address is already registered."
         "invalid_email" -> "Enter a valid email address."
         "authentication_not_configured" -> "Account sign-in is being configured. Please try again later."
-        "database_not_ready" -> "The account service is temporarily unavailable."
+        "database_not_ready", "database_schema_not_ready" -> "The account service is being prepared. Please try again later."
         "not_authenticated", "invalid_access_token" -> "Please sign in again."
         else -> detail.replace('_', ' ')
     }
